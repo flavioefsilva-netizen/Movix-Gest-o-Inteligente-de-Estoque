@@ -243,57 +243,71 @@ create index if not exists idx_count_documents_distributor on public.count_docum
 
 -- 1. Products
 alter table public.products enable row level security;
+drop policy if exists "Allow public read-write for all" on public.products;
 create policy "Allow public read-write for all" on public.products for all using (true) with check (true);
 
 -- 2. Clients
 alter table public.clients enable row level security;
+drop policy if exists "Allow public read-write for all" on public.clients;
 create policy "Allow public read-write for all" on public.clients for all using (true) with check (true);
 
 -- 3. Delivery Routes
 alter table public.delivery_routes enable row level security;
+drop policy if exists "Allow public read-write for all" on public.delivery_routes;
 create policy "Allow public read-write for all" on public.delivery_routes for all using (true) with check (true);
 
 -- 4. Counting Routes
 alter table public.counting_routes enable row level security;
+drop policy if exists "Allow public read-write for all" on public.counting_routes;
 create policy "Allow public read-write for all" on public.counting_routes for all using (true) with check (true);
 
 -- 5. Suppliers
 alter table public.suppliers enable row level security;
+drop policy if exists "Allow public read-write for all" on public.suppliers;
 create policy "Allow public read-write for all" on public.suppliers for all using (true) with check (true);
 
 -- 6. Employees
 alter table public.employees enable row level security;
+drop policy if exists "Allow public read-write for all" on public.employees;
 create policy "Allow public read-write for all" on public.employees for all using (true) with check (true);
 
 -- 7. Vehicles
 alter table public.vehicles enable row level security;
+drop policy if exists "Allow public read-write for all" on public.vehicles;
 create policy "Allow public read-write for all" on public.vehicles for all using (true) with check (true);
 
 -- 8. Transports
 alter table public.transports enable row level security;
+drop policy if exists "Allow public read-write for all" on public.transports;
 create policy "Allow public read-write for all" on public.transports for all using (true) with check (true);
 
 -- 9. Transports Liquidated
 alter table public.transports_liquidated enable row level security;
+drop policy if exists "Allow public read-write for all" on public.transports_liquidated;
 create policy "Allow public read-write for all" on public.transports_liquidated for all using (true) with check (true);
 
 -- 10. Movement Logs
 alter table public.movement_logs enable row level security;
+drop policy if exists "Allow public read-write for all" on public.movement_logs;
 create policy "Allow public read-write for all" on public.movement_logs for all using (true) with check (true);
 
 -- 11. Sobra Cliente Logs
 alter table public.sobra_cliente_logs enable row level security;
+drop policy if exists "Allow public read-write for all" on public.sobra_cliente_logs;
 create policy "Allow public read-write for all" on public.sobra_cliente_logs for all using (true) with check (true);
 
 -- 12. Count Documents
 alter table public.count_documents enable row level security;
+drop policy if exists "Allow public read-write for all" on public.count_documents;
 create policy "Allow public read-write for all" on public.count_documents for all using (true) with check (true);
 
 -- 13. Telegram Recipients
 alter table public.telegram_recipients enable row level security;
+drop policy if exists "Allow public read-write for all" on public.telegram_recipients;
 create policy "Allow public read-write for all" on public.telegram_recipients for all using (true) with check (true);
 
 -- 14. Distributors
 alter table public.distributors enable row level security;
+drop policy if exists "Allow public read-write for all" on public.distributors;
 create policy "Allow public read-write for all" on public.distributors for all using (true) with check (true);
 

@@ -5,7 +5,7 @@ import { useApp } from '../lib/AppContext';
 import { supabase } from '../lib/supabase';
 
 export default function Header() {
-  const { activeDistributor, activeDistributorName, activeView, isLoading, employees, currentUserEmail, getLoggedInUserName, userRole, setUserRole, logout } = useApp();
+  const { activeDistributor, activeDistributorName, activeView, isLoading, employees, currentUserEmail, getLoggedInUserName, userRole, setUserRole, logout, dbStatus, dbErrorMessage, retryDbConnection } = useApp();
 
   const viewNames = {
     dashboard: 'Painel do Administrador',
@@ -131,11 +131,48 @@ export default function Header() {
     <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-30 shadow-xs">
       <div className="flex items-center space-x-4">
         {/* Mobile Header Menu trigger or Title */}
-        <h2 className="text-lg font-bold text-slate-800 tracking-tight flex items-center gap-2">
+        <h2 className="text-lg font-bold text-slate-800 tracking-tight flex flex-wrap items-center gap-2">
           {viewNames[activeView] || 'MOVIX Enterprise'}
-          <span className="hidden md:inline px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[14px] font-semibold">
+          <span className="hidden sm:inline px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[13px] font-bold border border-blue-100">
             {activeDistributorName}
           </span>
+          
+          {/* Supabase Connection Status Badge */}
+          {dbStatus === 'checking' && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[11px] font-semibold border border-amber-100 animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              Verificando Banco...
+            </span>
+          )}
+          {dbStatus === 'connected' && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-semibold border border-emerald-100 relative">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping absolute" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 relative" />
+              Nuvem Ativa
+            </span>
+          )}
+          {dbStatus === 'disconnected' && (
+            <button
+              type="button"
+              onClick={() => retryDbConnection && retryDbConnection()}
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-slate-50 text-slate-500 text-[11px] font-semibold border border-slate-200 cursor-pointer hover:bg-slate-100 transition-all"
+              title="Sem conexão com o Supabase. Clique para tentar reconectar e ler as tabelas da nuvem."
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+              Offline (Local)
+            </button>
+          )}
+          {dbStatus === 'error' && (
+            <button
+              type="button"
+              onClick={() => retryDbConnection && retryDbConnection()}
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-rose-50 text-rose-700 text-[11px] font-bold border border-rose-100 animate-pulse cursor-pointer hover:bg-rose-100 transition-all"
+              title={`Erro de sincronização. Passe o mouse ou clique para tentar carregar as tabelas novamente.\n\nDetalhe do erro: ${dbErrorMessage || 'Tabelas do banco de dados não encontradas ou credenciais incorretas.'}`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+              Erro de Sincronia
+            </button>
+          )}
         </h2>
       </div>
 

@@ -478,7 +478,10 @@ export default function SuporteView() {
     activeDistributorName,
     employees,
     updateEmployee,
-    triggerSuporteStatusUpdate
+    triggerSuporteStatusUpdate,
+    dbStatus,
+    dbErrorMessage,
+    retryDbConnection
   } = useApp();
 
   // Active Presentation selection
@@ -1351,6 +1354,126 @@ export default function SuporteView() {
         
         {/* --- LEFT & CENTER COLUMN: MANUALS COMPACT LIST VIEW (reduced width) --- */}
         <div className="lg:col-span-5 space-y-6">
+          {/* --- DATABASE DIAGNOSTICS & SYNC STATUS PANEL --- */}
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs flex flex-col space-y-4">
+            <div className="flex items-center gap-3 border-b border-gray-100 pb-4 text-left">
+              <div className="shrink-0 p-1.5 bg-blue-50 border border-blue-100 rounded-xl text-blue-600">
+                <span className="material-symbols-outlined text-[24px]">database</span>
+              </div>
+              <div className="text-left">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-400 block">Sincronização:</span>
+                <h3 className="text-sm font-bold text-slate-800 leading-tight">Status do Banco de Dados</h3>
+              </div>
+            </div>
+
+            {/* Checking Status */}
+            {dbStatus === 'checking' && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col space-y-3 animate-pulse text-left">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping shrink-0" />
+                  <span className="text-xs font-bold text-amber-800">Verificando conexão...</span>
+                </div>
+                <p className="text-[11px] text-amber-700 leading-relaxed">
+                  O sistema está consultando os metadados do banco de dados na nuvem Supabase para validar a comunicação e as permissões de acesso.
+                </p>
+              </div>
+            )}
+
+            {/* Connected (Database Synced) Status */}
+            {dbStatus === 'connected' && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex flex-col space-y-3 text-left">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 relative flex shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                  </span>
+                  <span className="text-xs font-bold text-emerald-800">Nuvem Conectada e Sincronizada</span>
+                </div>
+                <p className="text-[11px] text-emerald-700 leading-relaxed">
+                  Sua aplicação está sincronizada em tempo real com o banco de dados Supabase! Qualquer alteração feita aqui será refletida instantaneamente para todos os usuários em qualquer dispositivo conectado.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => retryDbConnection()}
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer border border-emerald-700/10"
+                >
+                  <span className="material-symbols-outlined text-[14px]">sync</span>
+                  Forçar Sincronia Agora
+                </button>
+              </div>
+            )}
+
+            {/* Disconnected (Offline Fallback / LocalStorage) Status */}
+            {dbStatus === 'disconnected' && (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col space-y-3 text-left">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
+                  <span className="text-xs font-bold text-slate-700">Modo Offline (Dados Locais)</span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  A aplicação está rodando em modo isolado offline usando o <strong className="font-extrabold text-slate-800">Armazenamento Local (LocalStorage)</strong> do navegador.
+                </p>
+                <div className="bg-amber-50 border border-amber-100 rounded-lg p-2.5 text-[10px] text-amber-800 leading-relaxed">
+                  <strong className="font-bold">Por que isso acontece?</strong> As variáveis de ambiente do Supabase não foram configuradas no seu servidor ou painel de hospedagem Hostinger. Por isso, as alterações feitas neste computador <strong className="font-bold">ficam restritas a esta máquina</strong> e não aparecem em outras.
+                </div>
+                
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Como Ativar Compartilhamento:</span>
+                  <ol className="list-decimal list-inside text-[10px] text-slate-600 space-y-1 pl-1 leading-normal">
+                    <li>Acesse seu painel do <strong className="font-bold">Supabase</strong>.</li>
+                    <li>Vá em <strong className="font-bold">Project Settings &gt; API</strong>.</li>
+                    <li>Copie o <strong className="font-bold">Project URL</strong> e a chave <strong className="font-bold">anon public</strong>.</li>
+                    <li>No painel da <strong className="font-bold">Hostinger</strong> (Ambiente de VPS ou nas configurações de variáveis do Next.js), crie as seguintes chaves de ambiente:</li>
+                    <div className="bg-slate-100 p-1.5 rounded font-mono text-[9px] text-slate-800 my-1 font-bold space-y-0.5 border border-slate-200">
+                      <div>NEXT_PUBLIC_SUPABASE_URL=sua_url_aqui</div>
+                      <div>NEXT_PUBLIC_SUPABASE_ANON_KEY=sua_chave_aqui</div>
+                    </div>
+                    <li>Recompile ou reinicie a aplicação na Hostinger para que o servidor passe essas variáveis ao navegador.</li>
+                  </ol>
+                </div>
+              </div>
+            )}
+
+            {/* Error / Table Missing Status */}
+            {dbStatus === 'error' && (
+              <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 flex flex-col space-y-3 text-left">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                  <span className="text-xs font-bold text-rose-800">Falha na Sincronização de Tabelas</span>
+                </div>
+                <p className="text-[11px] text-rose-700 leading-relaxed">
+                  O Supabase está conectado, mas ocorreram falhas ao ler ou gravar os dados (o app caiu em fallback local para não travar):
+                </p>
+                <div className="bg-white/85 border border-rose-100 rounded-lg p-2.5 text-[10px] text-rose-800 font-mono break-all leading-normal max-h-24 overflow-y-auto">
+                  {dbErrorMessage}
+                </div>
+                <div className="bg-amber-50 border border-amber-100 rounded-lg p-2.5 text-[10px] text-amber-800 leading-relaxed">
+                  <strong className="font-bold">Causa Mais Comum:</strong> A estrutura de tabelas ainda não foi criada no banco de dados.
+                </div>
+
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider block">Como Corrigir em 1 Minuto:</span>
+                  <ol className="list-decimal list-inside text-[10px] text-slate-600 space-y-1 pl-1 leading-normal">
+                    <li>Abra o arquivo <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-[9px]">supabase_schema.sql</code> localizado na raiz deste projeto.</li>
+                    <li>Copie todo o código SQL de dentro dele.</li>
+                    <li>No painel do <strong className="font-bold">Supabase</strong>, clique em <strong className="font-bold">SQL Editor &gt; New Query</strong>.</li>
+                    <li>Cole o código copiado e clique em <strong className="font-bold">Run (Executar)</strong> no canto inferior direito.</li>
+                    <li>Após a execução concluída com sucesso, clique no botão abaixo para reatar a conexão.</li>
+                  </ol>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => retryDbConnection()}
+                  className="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer border border-rose-700/10"
+                >
+                  <span className="material-symbols-outlined text-[14px]">refresh</span>
+                  Reatar Conexão e Carregar Tabelas
+                </button>
+              </div>
+            )}
+          </div>
+
           <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs flex flex-col">
             <div className="flex items-center gap-2 border-b border-gray-100 pb-4 mb-5 text-left">
               <span className="material-symbols-outlined text-slate-400 text-[20px]">auto_stories</span>

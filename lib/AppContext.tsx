@@ -121,6 +121,9 @@ interface AppContextType {
   telegramRecipients: TelegramRecipient[];
   setTelegramRecipients: (recipients: TelegramRecipient[]) => void;
   triggerSuporteStatusUpdate: () => void;
+  dbStatus: 'connected' | 'disconnected' | 'error' | 'checking';
+  dbErrorMessage?: string;
+  retryDbConnection: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -492,6 +495,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Database Connection Status
+  const [dbStatus, setDbStatus] = useState<'connected' | 'disconnected' | 'error' | 'checking'>('checking');
+  const [dbErrorMessage, setDbErrorMessage] = useState<string | undefined>(undefined);
+
   // Dynamic list of active distributors
   const [distributors, setDistributors] = useState<{ id: string; name: string; cnpj?: string }[]>(() => {
     if (typeof window !== 'undefined') {
@@ -550,14 +557,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // ==========================================
 
   const loadDistributors = async () => {
-    if (!supabase) return;
+    if (!supabase) {
+      setDbStatus('disconnected');
+      return;
+    }
     try {
       const { data, error } = await supabase.from('distributors').select('*');
       if (error) {
         if (error.code === '42P01') {
           console.warn('[Supabase] Tabela "distributors" não existe. Usando local storage.');
+          setDbStatus('error');
+          setDbErrorMessage('A tabela "distributors" não existe no banco de dados. Por favor, crie as tabelas executando o script "supabase_schema.sql" no editor de SQL do Supabase.');
         } else {
           console.error('[Supabase] Erro ao carregar distribuidores:', error);
+          setDbStatus('error');
+          setDbErrorMessage(error.message);
         }
         return;
       }
@@ -569,8 +583,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         await supabase.from('distributors').upsert(defaultDist);
         setDistributors([defaultDist]);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('[Supabase] Falha ao carregar distribuidores:', e);
+      setDbStatus('error');
+      setDbErrorMessage(e?.message || String(e));
     }
   };
 
@@ -845,8 +861,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loadDataForDistributor = async (dist: Distributor) => {
-    if (!supabase) return;
+    if (!supabase) {
+      setDbStatus('disconnected');
+      return;
+    }
     setIsLoading(true);
+    setDbStatus('checking');
     try {
       console.log(`Loading Supabase datasets for distributor: ${dist}`);
       const [
@@ -905,6 +925,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       let activeTransports = transportsRes.data ? transportsRes.data.map(mapTransportFromDB) : (transportsRes.error ? previousState.activeTransports : null);
       let sobraClientes = sobraClienteLogsRes.data ? sobraClienteLogsRes.data.map(mapSobraClienteLogFromDB) : (sobraClienteLogsRes.error ? previousState.sobraClientes : null);
       let countDocuments = countDocumentsRes.data ? countDocumentsRes.data.map(mapCountDocumentFromDB) : (countDocumentsRes.error ? previousState.countDocuments : null);
+
+      // Check for errors
+      const errors = [
+        productsRes.error, clientsRes.error, deliveryRoutesRes.error,
+        countingRoutesRes.error, suppliersRes.error, employeesRes.error,
+        vehiclesRes.error, transportsLiquidatedRes.error, movementLogsRes.error,
+        transportsRes.error, sobraClienteLogsRes.error, countDocumentsRes.error
+      ].filter(Boolean);
+
+      if (errors.length > 0) {
+        console.warn('[Supabase] Alguns erros ao carregar tabelas para o distribuidor:', dist, errors);
+        setDbStatus('error');
+        const hasRelationError = errors.some(e => e && (e.code === '42P01' || e.message?.includes('relation') || e.message?.includes('does not exist')));
+        if (hasRelationError) {
+          setDbErrorMessage('Uma ou mais tabelas do banco de dados não existem. Por favor, certifique-se de executar o script "supabase_schema.sql" no painel SQL do seu projeto Supabase para criar as tabelas.');
+        } else {
+          setDbErrorMessage(errors.map(e => e?.message || '').join(' | '));
+        }
+      } else {
+        setDbStatus('connected');
+        setDbErrorMessage(undefined);
+      }
 
       // Fallback to previous state if null
       let finalProducts = products !== null ? products : previousState.products;
@@ -974,8 +1016,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         [dist]: updatedState
       }));
 
-    } catch (error) {
-      console.error(`Failed to load data from Supabase for distributor ${dist}:`, error);
+    } catch (error: any) {
+      console.warn(`Failed to load data from Supabase for distributor ${dist}:`, error);
+      setDbStatus('error');
+      setDbErrorMessage(error?.message || String(error));
     } finally {
       setIsLoading(false);
     }
@@ -1062,6 +1106,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('movix_active_view', activeView);
     localStorage.setItem('movix_active_cadastro_tab', activeCadastroTab);
   }, [authenticated, activeDistributor, activeView, activeCadastroTab, hydrated]);
+
+  // Handle offline fallback detection on mount
+  useEffect(() => {
+    if (hydrated && !supabase) {
+      setDbStatus('disconnected');
+    }
+  }, [hydrated]);
+
+  const retryDbConnection = async () => {
+    if (!supabase) {
+      setDbStatus('disconnected');
+      return;
+    }
+    setDbStatus('checking');
+    setDbErrorMessage(undefined);
+    try {
+      await loadDistributors();
+      await loadDataForDistributor(activeDistributor);
+      await loadTelegramRecipients();
+    } catch (e: any) {
+      setDbStatus('error');
+      setDbErrorMessage(e?.message || String(e));
+    }
+  };
 
   // Load from Supabase dynamically on Distributor switches or mount hydration
   useEffect(() => {
@@ -2110,6 +2178,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         userRole,
         setUserRole,
         userDistributorId,
+        dbStatus,
+        dbErrorMessage,
+        retryDbConnection,
 
         // Routing views
         activeView,
