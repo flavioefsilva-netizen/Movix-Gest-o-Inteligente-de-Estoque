@@ -1,17 +1,37 @@
 import { createClient } from '@supabase/supabase-js';
 
-const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const rawUrl = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_SUPABASE_URL : undefined;
+const supabaseAnonKey = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY : undefined;
 
 // Clean URL: remove any /rest/v1/ suffix for compatibility with @supabase/supabase-js
 const supabaseUrl = rawUrl
   ? rawUrl.replace(/\/rest\/v1\/?$/, '')
   : undefined;
 
-// Secure and lazy initialization to avoid crashing the dev server if keys are not set yet
-export const supabase = (supabaseUrl && supabaseAnonKey)
+// Use export let for live ES module bindings
+export let supabase = (supabaseUrl && supabaseAnonKey)
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
+
+/**
+ * Initializes the Supabase client dynamically at runtime.
+ * Useful when credentials are loaded from a server-side API.
+ */
+export function initializeDynamicSupabase(url: string, key: string) {
+  if (!url || !key) {
+    console.warn('[Supabase] Tentativa de inicialização dinâmica com credenciais incompletas.');
+    return null;
+  }
+  const cleanUrl = url.replace(/\/rest\/v1\/?$/, '');
+  try {
+    supabase = createClient(cleanUrl, key);
+    console.log('[Supabase] Cliente dinâmico inicializado com sucesso via API do servidor! ✔');
+    return supabase;
+  } catch (e) {
+    console.error('[Supabase] Erro ao instanciar cliente dinâmico do Supabase:', e);
+    return null;
+  }
+}
 
 export function getSupabaseClient() {
   if (!supabase) {
@@ -21,3 +41,4 @@ export function getSupabaseClient() {
   }
   return supabase;
 }
+

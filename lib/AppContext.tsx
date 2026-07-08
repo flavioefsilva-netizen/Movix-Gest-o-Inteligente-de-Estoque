@@ -12,7 +12,7 @@ import {
   INITIAL_DELIVERY_ROUTES,
   INITIAL_COUNTING_ROUTES
 } from './constants';
-import { supabase } from './supabase';
+import { supabase, initializeDynamicSupabase } from './supabase';
 
 type Distributor = string;
 
@@ -1107,37 +1107,52 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('movix_active_cadastro_tab', activeCadastroTab);
   }, [authenticated, activeDistributor, activeView, activeCadastroTab, hydrated]);
 
-  // Handle offline fallback detection on mount
-  useEffect(() => {
-    if (hydrated && !supabase) {
-      setDbStatus('disconnected');
+  // Unified sync database helper that handles dynamic client discovery
+  const syncDatabase = async (distId: Distributor) => {
+    setDbStatus('checking');
+    setDbErrorMessage(undefined);
+    
+    let isClientReady = !!supabase;
+    if (!isClientReady) {
+      try {
+        const res = await fetch('/api/supabase-config');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.supabaseUrl && data.supabaseAnonKey) {
+            const client = initializeDynamicSupabase(data.supabaseUrl, data.supabaseAnonKey);
+            isClientReady = !!client;
+          }
+        }
+      } catch (err) {
+        console.warn('[Supabase] Erro ao buscar chaves de runtime via API:', err);
+      }
     }
-  }, [hydrated]);
 
-  const retryDbConnection = async () => {
-    if (!supabase) {
+    if (!isClientReady) {
       setDbStatus('disconnected');
       return;
     }
-    setDbStatus('checking');
-    setDbErrorMessage(undefined);
+
     try {
       await loadDistributors();
-      await loadDataForDistributor(activeDistributor);
+      await loadDataForDistributor(distId);
       await loadTelegramRecipients();
     } catch (e: any) {
+      console.warn('[Supabase] Falha na sincronização dos dados:', e);
       setDbStatus('error');
       setDbErrorMessage(e?.message || String(e));
     }
   };
 
+  const retryDbConnection = async () => {
+    await syncDatabase(activeDistributor);
+  };
+
   // Load from Supabase dynamically on Distributor switches or mount hydration
   useEffect(() => {
-    if (hydrated && supabase) {
+    if (hydrated) {
       const timer = setTimeout(() => {
-        loadDistributors();
-        loadDataForDistributor(activeDistributor);
-        loadTelegramRecipients();
+        syncDatabase(activeDistributor);
       }, 0);
       return () => clearTimeout(timer);
     }
