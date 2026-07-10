@@ -1,16 +1,23 @@
 import { createClient } from '@supabase/supabase-js';
 
+const DEFAULT_URL = 'https://bpfdfunkmndwviwfyovi.supabase.co';
+const DEFAULT_KEY = 'sb_publishable_CwjadnejjA816OL-wJO8QA_o_uowhOg';
+
 const getInitialCredentials = () => {
   if (typeof window !== 'undefined') {
-    const localUrl = localStorage.getItem('movix_supabase_url');
-    const localKey = localStorage.getItem('movix_supabase_anon_key');
-    if (localUrl && localKey) {
-      return { url: localUrl, key: localKey };
+    let localUrl = localStorage.getItem('movix_supabase_url');
+    let localKey = localStorage.getItem('movix_supabase_anon_key');
+    if (!localUrl || !localKey) {
+      localStorage.setItem('movix_supabase_url', DEFAULT_URL);
+      localStorage.setItem('movix_supabase_anon_key', DEFAULT_KEY);
+      localUrl = DEFAULT_URL;
+      localKey = DEFAULT_KEY;
     }
+    return { url: localUrl, key: localKey };
   }
   const rawUrl = typeof process !== 'undefined' ? (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL) : undefined;
   const supabaseAnonKey = typeof process !== 'undefined' ? (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY) : undefined;
-  return { url: rawUrl, key: supabaseAnonKey };
+  return { url: rawUrl || DEFAULT_URL, key: supabaseAnonKey || DEFAULT_KEY };
 };
 
 const credentials = getInitialCredentials();

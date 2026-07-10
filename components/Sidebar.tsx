@@ -92,7 +92,7 @@ export default function Sidebar() {
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
                 <h1 className="text-sm font-black tracking-wider text-slate-800 leading-none">MOVIX</h1>
-                <span className="text-[9px] font-extrabold text-slate-700 bg-slate-200/50 px-1 rounded-sm leading-none py-0.5">V 2.0</span>
+                <span className="text-[9px] font-extrabold text-slate-700 bg-slate-200/50 px-1 rounded-sm leading-none py-0.5">V 2.1</span>
               </div>
               <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-1">LOGISTICS SYSTEM</span>
             </div>
@@ -179,7 +179,7 @@ export default function Sidebar() {
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5">
             <span className="text-[18px] font-black tracking-wider text-blue-600 leading-none">MOVIX</span>
-            <span className="text-[9px] font-extrabold text-blue-700 bg-blue-50 border border-blue-200 px-1 rounded-sm leading-none py-0.5">V 2.0</span>
+            <span className="text-[9px] font-extrabold text-blue-700 bg-blue-50 border border-blue-200 px-1 rounded-sm leading-none py-0.5">V 2.1</span>
           </div>
           <span className="text-[9px] font-bold text-gray-700 tracking-tight mt-1 leading-tight">
             Gestão Inteligente de Estoque
