@@ -124,6 +124,10 @@ interface AppContextType {
   dbStatus: 'connected' | 'disconnected' | 'error' | 'checking';
   dbErrorMessage?: string;
   retryDbConnection: () => Promise<void>;
+  isMobileMenuOpen: boolean;
+  setIsMobileMenuOpen: (open: boolean) => void;
+  isSupabaseModalOpen: boolean;
+  setIsSupabaseModalOpen: (open: boolean) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -494,6 +498,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Hydration safety
   const [hydrated, setHydrated] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState<boolean>(false);
 
   // Database Connection Status
   const [dbStatus, setDbStatus] = useState<'connected' | 'disconnected' | 'error' | 'checking'>('checking');
@@ -860,13 +866,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const loadDataForDistributor = async (dist: Distributor) => {
+  const loadDataForDistributor = async (dist: Distributor, silent = false) => {
     if (!supabase) {
       setDbStatus('disconnected');
       return;
     }
-    setIsLoading(true);
-    setDbStatus('checking');
+    if (!silent) {
+      setIsLoading(true);
+      setDbStatus('checking');
+    }
     try {
       console.log(`Loading Supabase datasets for distributor: ${dist}`);
       const [
@@ -1018,10 +1026,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     } catch (error: any) {
       console.warn(`Failed to load data from Supabase for distributor ${dist}:`, error);
-      setDbStatus('error');
-      setDbErrorMessage(error?.message || String(error));
+      if (!silent) {
+        setDbStatus('error');
+        setDbErrorMessage(error?.message || String(error));
+      }
     } finally {
-      setIsLoading(false);
+      if (!silent) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -1108,11 +1120,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [authenticated, activeDistributor, activeView, activeCadastroTab, hydrated]);
 
   // Unified sync database helper that handles dynamic client discovery
-  const syncDatabase = async (distId: Distributor) => {
-    setDbStatus('checking');
-    setDbErrorMessage(undefined);
+  const syncDatabase = async (distId: Distributor, silent = false) => {
+    if (!silent) {
+      setDbStatus('checking');
+      setDbErrorMessage(undefined);
+    }
     
     let isClientReady = !!supabase;
+    if (!isClientReady) {
+      // Check if we have credentials in localStorage
+      if (typeof window !== 'undefined') {
+        const localUrl = localStorage.getItem('movix_supabase_url');
+        const localKey = localStorage.getItem('movix_supabase_anon_key');
+        if (localUrl && localKey) {
+          const client = initializeDynamicSupabase(localUrl, localKey);
+          isClientReady = !!client;
+        }
+      }
+    }
+
     if (!isClientReady) {
       try {
         const res = await fetch('/api/supabase-config');
@@ -1124,7 +1150,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch (err) {
-        console.warn('[Supabase] Erro ao buscar chaves de runtime via API:', err);
+        if (!silent) {
+          console.warn('[Supabase] Erro ao buscar chaves de runtime via API:', err);
+        }
       }
     }
 
@@ -1134,13 +1162,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      await loadDistributors();
-      await loadDataForDistributor(distId);
-      await loadTelegramRecipients();
+      if (!silent) {
+        await loadDistributors();
+      }
+      await loadDataForDistributor(distId, silent);
+      if (!silent) {
+        await loadTelegramRecipients();
+      }
     } catch (e: any) {
       console.warn('[Supabase] Falha na sincronização dos dados:', e);
-      setDbStatus('error');
-      setDbErrorMessage(e?.message || String(e));
+      if (!silent) {
+        setDbStatus('error');
+        setDbErrorMessage(e?.message || String(e));
+      }
     }
   };
 
@@ -1158,6 +1192,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDistributor, hydrated]);
+
+  // Background polling to keep all users in sync (real-time simulation via fast pulling)
+  useEffect(() => {
+    if (!hydrated || dbStatus !== 'connected') return;
+
+    const intervalId = setInterval(() => {
+      syncDatabase(activeDistributor, true);
+    }, 12000); // Poll every 12 seconds for fresh updates
+
+    return () => clearInterval(intervalId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDistributor, hydrated, dbStatus]);
 
   // Automatically resolve logged-in user's distributor and role
   useEffect(() => {
@@ -2196,6 +2242,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         dbStatus,
         dbErrorMessage,
         retryDbConnection,
+        isMobileMenuOpen,
+        setIsMobileMenuOpen,
+        isSupabaseModalOpen,
+        setIsSupabaseModalOpen,
 
         // Routing views
         activeView,

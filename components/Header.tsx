@@ -5,7 +5,7 @@ import { useApp } from '../lib/AppContext';
 import { supabase } from '../lib/supabase';
 
 export default function Header() {
-  const { activeDistributor, activeDistributorName, activeView, isLoading, employees, currentUserEmail, getLoggedInUserName, userRole, setUserRole, logout, dbStatus, dbErrorMessage, retryDbConnection } = useApp();
+  const { activeDistributor, activeDistributorName, activeView, isLoading, employees, currentUserEmail, getLoggedInUserName, userRole, setUserRole, logout, dbStatus, dbErrorMessage, retryDbConnection, isMobileMenuOpen, setIsMobileMenuOpen, isSupabaseModalOpen, setIsSupabaseModalOpen } = useApp();
 
   const viewNames = {
     dashboard: 'Painel do Administrador',
@@ -129,7 +129,17 @@ export default function Header() {
 
   return (
     <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-30 shadow-xs">
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-1 md:space-x-4">
+        <button
+          type="button"
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="md:hidden flex items-center justify-center p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer mr-1 shrink-0"
+          title="Menu de Navegação"
+        >
+          <span className="material-symbols-outlined text-[24px] select-none font-bold">
+            {isMobileMenuOpen ? 'menu_open' : 'menu'}
+          </span>
+        </button>
         {/* Mobile Header Menu trigger or Title */}
         <h2 className="text-lg font-bold text-slate-800 tracking-tight flex flex-wrap items-center gap-2">
           {viewNames[activeView] || 'MOVIX Enterprise'}
@@ -139,24 +149,34 @@ export default function Header() {
           
           {/* Supabase Connection Status Badge */}
           {dbStatus === 'checking' && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[11px] font-semibold border border-amber-100 animate-pulse">
+            <button
+              type="button"
+              onClick={() => setIsSupabaseModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[11px] font-semibold border border-amber-100 animate-pulse cursor-pointer hover:bg-amber-100 transition-all"
+              title="Verificando conexão com o banco de dados. Clique para ver ou editar as chaves."
+            >
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
               Verificando Banco...
-            </span>
+            </button>
           )}
           {dbStatus === 'connected' && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-semibold border border-emerald-100 relative">
+            <button
+              type="button"
+              onClick={() => setIsSupabaseModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-semibold border border-emerald-100 relative cursor-pointer hover:bg-emerald-100 transition-all"
+              title="Conectado com sucesso na nuvem! Clique para ver as chaves de conexão."
+            >
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping absolute" />
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 relative" />
               Nuvem Ativa
-            </span>
+            </button>
           )}
           {dbStatus === 'disconnected' && (
             <button
               type="button"
-              onClick={() => retryDbConnection && retryDbConnection()}
+              onClick={() => setIsSupabaseModalOpen(true)}
               className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-slate-50 text-slate-500 text-[11px] font-semibold border border-slate-200 cursor-pointer hover:bg-slate-100 transition-all"
-              title="Sem conexão com o Supabase. Clique para tentar reconectar e ler as tabelas da nuvem."
+              title="Sua aplicação está Offline e rodando localmente no navegador. Clique aqui para configurar as credenciais do Supabase e sincronizar com todos os usuários."
             >
               <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
               Offline (Local)
@@ -165,9 +185,9 @@ export default function Header() {
           {dbStatus === 'error' && (
             <button
               type="button"
-              onClick={() => retryDbConnection && retryDbConnection()}
+              onClick={() => setIsSupabaseModalOpen(true)}
               className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-rose-50 text-rose-700 text-[11px] font-bold border border-rose-100 animate-pulse cursor-pointer hover:bg-rose-100 transition-all"
-              title={`Erro de sincronização. Passe o mouse ou clique para tentar carregar as tabelas novamente.\n\nDetalhe do erro: ${dbErrorMessage || 'Tabelas do banco de dados não encontradas ou credenciais incorretas.'}`}
+              title={`Erro de sincronização. Clique para configurar as chaves ou tentar reconectar.\n\nDetalhe do erro: ${dbErrorMessage || 'Tabelas do banco de dados não encontradas ou credenciais incorretas.'}`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
               Erro de Sincronia

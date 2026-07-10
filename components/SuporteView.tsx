@@ -481,7 +481,8 @@ export default function SuporteView() {
     triggerSuporteStatusUpdate,
     dbStatus,
     dbErrorMessage,
-    retryDbConnection
+    retryDbConnection,
+    setIsSupabaseModalOpen
   } = useApp();
 
   // Active Presentation selection
@@ -1400,6 +1401,14 @@ export default function SuporteView() {
                   <span className="material-symbols-outlined text-[14px]">sync</span>
                   Forçar Sincronia Agora
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSupabaseModalOpen(true)}
+                  className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-200"
+                >
+                  <span className="material-symbols-outlined text-[14px]">settings</span>
+                  Ver / Editar API do Supabase
+                </button>
               </div>
             )}
 
@@ -1431,6 +1440,15 @@ export default function SuporteView() {
                     <li>Recompile ou reinicie a aplicação na Hostinger para que o servidor passe essas variáveis ao navegador.</li>
                   </ol>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsSupabaseModalOpen(true)}
+                  className="w-full mt-2 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[14px]">settings</span>
+                  Configurar Supabase Manualmente
+                </button>
               </div>
             )}
 
@@ -1469,6 +1487,14 @@ export default function SuporteView() {
                 >
                   <span className="material-symbols-outlined text-[14px]">refresh</span>
                   Reatar Conexão e Carregar Tabelas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSupabaseModalOpen(true)}
+                  className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-200"
+                >
+                  <span className="material-symbols-outlined text-[14px]">settings</span>
+                  Reconfigurar API do Supabase
                 </button>
               </div>
             )}

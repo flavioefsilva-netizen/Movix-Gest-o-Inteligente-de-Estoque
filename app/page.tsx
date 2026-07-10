@@ -15,6 +15,7 @@ import CreateTransportModal from '../components/CreateTransportModal';
 import VeiculoEntregaModal from '../components/VeiculoEntregaModal';
 import ConferenciaModal from '../components/ConferenciaModal';
 import ContagemClienteModal from '../components/ContagemClienteModal';
+import ConfigSupabaseModal from '../components/ConfigSupabaseModal';
 
 function AppShellContent() {
   const { authenticated, activeView, activeDistributor, setActiveView, selectedAction, setSelectedAction, userRole } = useApp();
@@ -125,6 +126,7 @@ function AppShellContent() {
       {selectedAction === 'veiculo_entrega' && <VeiculoEntregaModal />}
       {selectedAction === 'conferencia' && <ConferenciaModal />}
       {selectedAction === 'contagem_cliente' && <ContagemClienteModal />}
+      <ConfigSupabaseModal />
     </div>
   );
 }

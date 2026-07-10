@@ -18,7 +18,9 @@ export default function Sidebar() {
     reportsTab,
     setReportsTab,
     userRole,
-    isLoading
+    isLoading,
+    isMobileMenuOpen,
+    setIsMobileMenuOpen
   } = useApp();
 
   const [isActionsOpen, setIsActionsOpen] = useState(false);
@@ -57,68 +59,96 @@ export default function Sidebar() {
     }
   }, [isReportsOpen]);
 
+  // Automatically close mobile menu when views, tabs, or actions change
+  useEffect(() => {
+    if (setIsMobileMenuOpen) {
+      setIsMobileMenuOpen(false);
+    }
+  }, [activeView, selectedAction, activeCadastroTab, reportsTab, setIsMobileMenuOpen]);
+
   if (userRole === 'Entregador' || userRole === 'Comercial') {
     return (
-      <aside className="hidden md:flex flex-col w-72 bg-gray-100 text-gray-800 sticky top-0 h-screen overflow-y-auto shrink-0 border-r border-gray-250">
-        {/* Brand Header */}
-        <div className="p-4 bg-gray-50 border-b border-gray-200 flex items-center gap-3 w-full">
-          <div className="p-1.5 bg-gray-100 rounded-xl flex items-center justify-center shrink-0 w-11 h-11 border border-gray-200 shadow-3xs">
-            <svg viewBox="0 0 120 100" className="w-8 h-8" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M 12 35 C 12 28, 28 28, 28 35 L 28 85 C 28 85, 12 85, 12 85 Z" fill="#0c1e45" />
-              <path d="M 92 50 C 92 45, 108 45, 108 50 L 108 85 Z" fill="#0c1e45" />
-              <path d="M 20 40 L 58 80 L 105 25" stroke="#1e62ec" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M 85 24 L 110 20 L 105 45" stroke="#1e62ec" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-          <div className="flex flex-col">
-            <div className="flex items-center gap-1.5">
-              <h1 className="text-sm font-black tracking-wider text-slate-800 leading-none">MOVIX</h1>
-              <span className="text-[9px] font-extrabold text-slate-700 bg-slate-200/50 px-1 rounded-sm leading-none py-0.5">V 1.3</span>
+      <>
+        {/* Backdrop for mobile */}
+        {isMobileMenuOpen && (
+          <div 
+            className="fixed inset-0 bg-black/40 z-40 md:hidden animate-in fade-in duration-200"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
+        <aside className={`fixed inset-y-0 left-0 z-50 flex flex-col w-72 bg-gray-100 text-gray-800 h-screen overflow-y-auto border-r border-gray-250 shadow-2xl transition-transform duration-300 md:sticky md:top-0 md:translate-x-0 md:z-0 md:shadow-none md:flex ${
+          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}>
+          {/* Brand Header */}
+          <div className="p-4 bg-gray-50 border-b border-gray-200 flex items-center gap-3 w-full shrink-0">
+            <div className="p-1.5 bg-gray-100 rounded-xl flex items-center justify-center shrink-0 w-11 h-11 border border-gray-200 shadow-3xs">
+              <svg viewBox="0 0 120 100" className="w-8 h-8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M 12 35 C 12 28, 28 28, 28 35 L 28 85 C 28 85, 12 85, 12 85 Z" fill="#0c1e45" />
+                <path d="M 92 50 C 92 45, 108 45, 108 50 L 108 85 Z" fill="#0c1e45" />
+                <path d="M 20 40 L 58 80 L 105 25" stroke="#1e62ec" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M 85 24 L 110 20 L 105 45" stroke="#1e62ec" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </div>
-            <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-1">LOGISTICS SYSTEM</span>
-          </div>
-        </div>
-
-        <div className="flex-1 p-6 flex flex-col items-center justify-center text-center space-y-4">
-          <span className="material-symbols-outlined text-gray-400 text-5xl">lock_person</span>
-          <div>
-            <h4 className="text-xs font-black text-gray-700 uppercase tracking-wider">Acesso Restrito</h4>
-            <p className="text-[10px] text-gray-500 mt-1 max-w-[180px] mx-auto uppercase font-bold leading-relaxed">
-              Seu perfil de {userRole} possui acesso exclusivo ao painel operativo ativo.
-            </p>
-          </div>
-        </div>
-
-        {/* User Footer block */}
-        <div className="p-4 border-t border-gray-400 bg-gray-200">
-          <div className="flex flex-col gap-2.5">
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 font-extrabold text-sm border border-gray-300">
-                {userRole === 'Entregador' ? 'ET' : 'CO'}
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1.5">
+                <h1 className="text-sm font-black tracking-wider text-slate-800 leading-none">MOVIX</h1>
+                <span className="text-[9px] font-extrabold text-slate-700 bg-slate-200/50 px-1 rounded-sm leading-none py-0.5">V 1.3</span>
               </div>
-              <div>
-                <p className="text-xs font-bold text-gray-800">{userRole}</p>
-                <p className="text-[9px] text-gray-600 uppercase tracking-widest leading-none">{activeDistributorName}</p>
-              </div>
+              <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-1">LOGISTICS SYSTEM</span>
             </div>
-            <button
-              onClick={logout}
-              className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-red-100/80 hover:bg-red-200 text-red-700 font-bold text-[11px] uppercase tracking-wider transition-all border border-red-300/40 cursor-pointer"
-              title="Sair do Sistema"
-            >
-              <span className="material-symbols-outlined text-sm">logout</span>
-              <span>Sair da Aplicação</span>
-            </button>
           </div>
-        </div>
-      </aside>
+
+          <div className="flex-1 p-6 flex flex-col items-center justify-center text-center space-y-4">
+            <span className="material-symbols-outlined text-gray-400 text-5xl">lock_person</span>
+            <div>
+              <h4 className="text-xs font-black text-gray-700 uppercase tracking-wider">Acesso Restrito</h4>
+              <p className="text-[10px] text-gray-500 mt-1 max-w-[180px] mx-auto uppercase font-bold leading-relaxed">
+                Seu perfil de {userRole} possui acesso exclusivo ao painel operativo ativo.
+              </p>
+            </div>
+          </div>
+
+          {/* User Footer block */}
+          <div className="p-4 border-t border-gray-400 bg-gray-200 shrink-0">
+            <div className="flex flex-col gap-2.5">
+              <div className="flex items-center space-x-3">
+                <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 font-extrabold text-sm border border-gray-300">
+                  {userRole === 'Entregador' ? 'ET' : 'CO'}
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-800">{userRole}</p>
+                  <p className="text-[9px] text-gray-600 uppercase tracking-widest leading-none">{activeDistributorName}</p>
+                </div>
+              </div>
+              <button
+                onClick={logout}
+                className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-red-100/80 hover:bg-red-200 text-red-700 font-bold text-[11px] uppercase tracking-wider transition-all border border-red-300/40 cursor-pointer"
+                title="Sair do Sistema"
+              >
+                <span className="material-symbols-outlined text-sm">logout</span>
+                <span>Sair da Aplicação</span>
+              </button>
+            </div>
+          </div>
+        </aside>
+      </>
     );
   }
 
   return (
-    <aside className="hidden md:flex flex-col w-72 bg-gray-100 text-gray-800 sticky top-0 h-screen overflow-y-auto shrink-0 border-r border-gray-250">
-      {/* Brand Header */}
-      <div className="p-4 bg-gray-50 border-b border-gray-200 flex items-center gap-3 w-full">
+    <>
+      {/* Backdrop for mobile */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/40 z-40 md:hidden animate-in fade-in duration-200"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+      <aside className={`fixed inset-y-0 left-0 z-50 flex flex-col w-72 bg-gray-100 text-gray-800 h-screen overflow-y-auto border-r border-gray-250 shadow-2xl transition-transform duration-300 md:sticky md:top-0 md:translate-x-0 md:z-0 md:shadow-none md:flex ${
+        isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}>
+        {/* Brand Header */}
+        <div className="p-4 bg-gray-50 border-b border-gray-200 flex items-center gap-3 w-full shrink-0">
         {/* Gray background icon on the left representing the M and arrow logo */}
         <div className="p-1.5 bg-gray-100 rounded-xl flex items-center justify-center shrink-0 w-11 h-11 border border-gray-200 shadow-3xs">
           <svg viewBox="0 0 120 100" className="w-8 h-8" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -514,5 +544,6 @@ export default function Sidebar() {
         </div>
       </div>
     </aside>
+    </>
   );
 }
