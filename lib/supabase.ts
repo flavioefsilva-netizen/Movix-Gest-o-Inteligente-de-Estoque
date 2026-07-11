@@ -5,15 +5,23 @@ const DEFAULT_KEY = 'sb_publishable_CwjadnejjA816OL-wJO8QA_o_uowhOg';
 
 const getInitialCredentials = () => {
   if (typeof window !== 'undefined') {
-    let localUrl = localStorage.getItem('movix_supabase_url');
-    let localKey = localStorage.getItem('movix_supabase_anon_key');
-    if (!localUrl || !localKey) {
-      localStorage.setItem('movix_supabase_url', DEFAULT_URL);
-      localStorage.setItem('movix_supabase_anon_key', DEFAULT_KEY);
-      localUrl = DEFAULT_URL;
-      localKey = DEFAULT_KEY;
+    try {
+      let localUrl = localStorage.getItem('movix_supabase_url');
+      let localKey = localStorage.getItem('movix_supabase_anon_key');
+      if (!localUrl || !localKey) {
+        try {
+          localStorage.setItem('movix_supabase_url', DEFAULT_URL);
+          localStorage.setItem('movix_supabase_anon_key', DEFAULT_KEY);
+        } catch (setErr) {
+          console.warn('[Supabase] Could not write default keys to localStorage:', setErr);
+        }
+        localUrl = DEFAULT_URL;
+        localKey = DEFAULT_KEY;
+      }
+      return { url: localUrl, key: localKey };
+    } catch (e) {
+      console.warn('[Supabase] Could not access localStorage, using defaults:', e);
     }
-    return { url: localUrl, key: localKey };
   }
   const rawUrl = typeof process !== 'undefined' ? (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL) : undefined;
   const supabaseAnonKey = typeof process !== 'undefined' ? (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY) : undefined;

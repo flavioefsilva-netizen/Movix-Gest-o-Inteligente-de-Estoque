@@ -52,9 +52,13 @@ export default function Header() {
       }
 
       // 1. Try local storage first for instant load
-      const saved = localStorage.getItem(`movix_avatar_${userEmail.toLowerCase()}`);
-      if (saved) {
-        if (active) setProfileAvatar(saved);
+      try {
+        const saved = localStorage.getItem(`movix_avatar_${userEmail.toLowerCase()}`);
+        if (saved) {
+          if (active) setProfileAvatar(saved);
+        }
+      } catch (err) {
+        console.warn('Unable to read avatar from localStorage:', err);
       }
 
       // 2. Fetch from Supabase Auth metadata to synchronize across different devices
@@ -66,7 +70,11 @@ export default function Header() {
             if (active) {
               setProfileAvatar(remoteAvatar);
               // Save to localStorage so it is instantly available next time on this machine
-              localStorage.setItem(`movix_avatar_${userEmail.toLowerCase()}`, remoteAvatar);
+              try {
+                localStorage.setItem(`movix_avatar_${userEmail.toLowerCase()}`, remoteAvatar);
+              } catch (setErr) {
+                console.warn('Unable to write avatar to localStorage:', setErr);
+              }
             }
           }
         } catch (err) {
@@ -96,7 +104,11 @@ export default function Header() {
       const base64String = reader.result as string;
       setProfileAvatar(base64String);
       if (userEmail) {
-        localStorage.setItem(`movix_avatar_${userEmail.toLowerCase()}`, base64String);
+        try {
+          localStorage.setItem(`movix_avatar_${userEmail.toLowerCase()}`, base64String);
+        } catch (setErr) {
+          console.warn('Unable to write uploaded avatar to localStorage:', setErr);
+        }
       }
 
       // Sync to Supabase Auth metadata

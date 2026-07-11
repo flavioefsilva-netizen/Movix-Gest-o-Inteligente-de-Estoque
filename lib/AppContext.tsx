@@ -509,13 +509,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Dynamic list of active distributors
   const [distributors, setDistributors] = useState<{ id: string; name: string; cnpj?: string }[]>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('movix_distributors');
-      if (saved) {
-        try {
+      try {
+        const saved = localStorage.getItem('movix_distributors');
+        if (saved) {
           return JSON.parse(saved);
-        } catch (e) {
-          console.error('Error parsing distributors', e);
         }
+      } catch (e) {
+        console.error('Error parsing distributors from localStorage', e);
       }
     }
     return [{ id: 'A', name: 'ESTEVES E SILVA LTDA', cnpj: '24.123.456/0001-89' }];
@@ -524,13 +524,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Separate states for each distributor (acting as our active memory cache)
   const [distributorStates, setDistributorStates] = useState<Record<string, AppState>>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('movix_distributor_states');
-      if (saved) {
-        try {
+      try {
+        const saved = localStorage.getItem('movix_distributor_states');
+        if (saved) {
           return JSON.parse(saved);
-        } catch (e) {
-          console.error('Error parsing distributor states from localStorage', e);
         }
+      } catch (e) {
+        console.error('Error parsing distributor states from localStorage', e);
       }
     }
     return {
@@ -554,8 +554,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Save distributors and distributorStates dynamically
   useEffect(() => {
     if (hydrated) {
-      localStorage.setItem('movix_distributors', JSON.stringify(distributors));
-      localStorage.setItem('movix_distributor_states', JSON.stringify(distributorStates));
+      try {
+        localStorage.setItem('movix_distributors', JSON.stringify(distributors));
+        localStorage.setItem('movix_distributor_states', JSON.stringify(distributorStates));
+      } catch (e) {
+        console.warn('Unable to write to localStorage:', e);
+      }
     }
   }, [distributors, distributorStates, hydrated]);
 
@@ -1081,27 +1085,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Safely restore basic local session variables on mount
   useEffect(() => {
     const loadSession = () => {
-      const isAuth = localStorage.getItem('movix_authenticated') === 'true';
-      setAuthenticated(isAuth);
+      try {
+        const isAuth = localStorage.getItem('movix_authenticated') === 'true';
+        setAuthenticated(isAuth);
 
-      const savedDist = localStorage.getItem('movix_active_distributor') as Distributor;
-      if (savedDist && distributors.some(d => d.id === savedDist)) {
-        setActiveDistributor(savedDist);
-      }
+        const savedDist = localStorage.getItem('movix_active_distributor') as Distributor;
+        if (savedDist && distributors.some(d => d.id === savedDist)) {
+          setActiveDistributor(savedDist);
+        }
 
-      const savedView = localStorage.getItem('movix_active_view') as any;
-      if (savedView) {
-        setActiveView(savedView);
-      }
+        const savedView = localStorage.getItem('movix_active_view') as any;
+        if (savedView) {
+          setActiveView(savedView);
+        }
 
-      const savedTab = localStorage.getItem('movix_active_cadastro_tab') as any;
-      if (savedTab) {
-        setActiveCadastroTab(savedTab);
-      }
+        const savedTab = localStorage.getItem('movix_active_cadastro_tab') as any;
+        if (savedTab) {
+          setActiveCadastroTab(savedTab);
+        }
 
-      const savedEmail = localStorage.getItem('movix_user_email');
-      if (savedEmail) {
-        setCurrentUserEmail(savedEmail);
+        const savedEmail = localStorage.getItem('movix_user_email');
+        if (savedEmail) {
+          setCurrentUserEmail(savedEmail);
+        }
+      } catch (err) {
+        console.warn('Error loading session from localStorage:', err);
       }
 
       setHydrated(true);
@@ -1115,10 +1123,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Sync session indicators back to local storage
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem('movix_authenticated', String(authenticated));
-    localStorage.setItem('movix_active_distributor', activeDistributor);
-    localStorage.setItem('movix_active_view', activeView);
-    localStorage.setItem('movix_active_cadastro_tab', activeCadastroTab);
+    try {
+      localStorage.setItem('movix_authenticated', String(authenticated));
+      localStorage.setItem('movix_active_distributor', activeDistributor);
+      localStorage.setItem('movix_active_view', activeView);
+      localStorage.setItem('movix_active_cadastro_tab', activeCadastroTab);
+    } catch (err) {
+      console.warn('Unable to sync session to localStorage:', err);
+    }
   }, [authenticated, activeDistributor, activeView, activeCadastroTab, hydrated]);
 
   // Unified sync database helper that handles dynamic client discovery
@@ -1132,11 +1144,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!isClientReady) {
       // Check if we have credentials in localStorage
       if (typeof window !== 'undefined') {
-        const localUrl = localStorage.getItem('movix_supabase_url');
-        const localKey = localStorage.getItem('movix_supabase_anon_key');
-        if (localUrl && localKey) {
-          const client = initializeDynamicSupabase(localUrl, localKey);
-          isClientReady = !!client;
+        try {
+          const localUrl = localStorage.getItem('movix_supabase_url');
+          const localKey = localStorage.getItem('movix_supabase_anon_key');
+          if (localUrl && localKey) {
+            const client = initializeDynamicSupabase(localUrl, localKey);
+            isClientReady = !!client;
+          }
+        } catch (err) {
+          console.warn('Error fetching credentials from localStorage:', err);
         }
       }
     }
@@ -1286,7 +1302,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAuthenticated(true);
     setCurrentUserEmail(email);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('movix_user_email', email);
+      try {
+        localStorage.setItem('movix_user_email', email);
+      } catch (err) {
+        console.warn('Unable to write user email to localStorage:', err);
+      }
     }
   };
 
@@ -1295,8 +1315,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUserRole(null);
     setUserDistributorId(null);
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('movix_authenticated');
-      localStorage.removeItem('movix_user_email');
+      try {
+        localStorage.removeItem('movix_authenticated');
+        localStorage.removeItem('movix_user_email');
+      } catch (err) {
+        console.warn('Unable to clear local storage session:', err);
+      }
     }
   };
 
