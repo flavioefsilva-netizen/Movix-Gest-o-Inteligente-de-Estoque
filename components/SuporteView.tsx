@@ -1662,18 +1662,40 @@ export default function SuporteView() {
             
             {/* Quadrant Header */}
             <div className="border-b border-gray-100 pb-3 text-left">
-              <div className="flex items-center gap-3">
-                <div className="shrink-0">
-                  <svg viewBox="0 0 24 24" className="w-10 h-10 select-none drop-shadow-sm" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="12" r="11" fill="#24A1DE" />
-                    <path d="M17.5 7.97l-2.61 12.3c-.2.9-.73 1.12-1.48.7L9.36 17.9l-1.95 1.88c-.22.22-.4.4-.82.4l.29-4.13 7.52-6.8c.33-.29-.07-.45-.51-.16L4.62 14.1l-4-1.25c-.87-.27-.89-.87.18-1.3L16.4 5.23c.73-.27 1.37.17 1.1 2.74z" fill="white" />
-                  </svg>
+              <div className="flex items-center justify-between gap-3 w-full">
+                <div className="flex items-center gap-3">
+                  <div className="shrink-0">
+                    <svg viewBox="0 0 24 24" className="w-10 h-10 select-none drop-shadow-sm" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="12" cy="12" r="11" fill="#24A1DE" />
+                      <path d="M17.5 7.97l-2.61 12.3c-.2.9-.73 1.12-1.48.7L9.36 17.9l-1.95 1.88c-.22.22-.4.4-.82.4l.29-4.13 7.52-6.8c.33-.29-.07-.45-.51-.16L4.62 14.1l-4-1.25c-.87-.27-.89-.87.18-1.3L16.4 5.23c.73-.27 1.37.17 1.1 2.74z" fill="white" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                      Relatórios via Telegram
+                    </h3>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider">
-                    Relatórios via Telegram
-                  </h3>
-                </div>
+
+                {/* Relatórios via Telegram Enviar Button */}
+                <button
+                  type="button"
+                  onClick={handleSendTelegramReport}
+                  disabled={isSendingTelegram || activeChatIds.length === 0}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-extrabold h-9 px-4 rounded-xl text-[11px] uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm active:scale-98 shrink-0"
+                >
+                  {isSendingTelegram ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white/35 border-t-white rounded-full animate-spin shrink-0" />
+                      <span>Enviando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[14px] font-bold">send</span>
+                      <span>Enviar</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
 
@@ -1794,36 +1816,16 @@ export default function SuporteView() {
           </div>
 
           {/* Action buttons and Status block */}
-          <div className="pt-4 border-t border-gray-100 space-y-3 mt-4">
-            
-            {telegramStatus && (
+          {telegramStatus && (
+            <div className="pt-4 border-t border-gray-100 space-y-3 mt-4">
               <div className={`p-3 rounded-xl border text-xs text-left font-bold flex items-start gap-2 animate-in fade-in duration-200 bg-rose-50 text-rose-800 border-rose-200`}>
                 <span className="material-symbols-outlined text-[15px] mt-0.5 shrink-0">
                   error
                 </span>
                 <span className="leading-snug">{telegramStatus.msg}</span>
               </div>
-            )}
-
-            <button
-              type="button"
-              onClick={handleSendTelegramReport}
-              disabled={isSendingTelegram || activeChatIds.length === 0}
-              className="w-1/2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-extrabold py-3.5 px-4 rounded-xl text-xs uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm active:scale-98"
-            >
-              {isSendingTelegram ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/35 border-t-white rounded-full animate-spin shrink-0" />
-                  <span>Transmitindo...</span>
-                </>
-              ) : (
-                <>
-                  <span className="material-symbols-outlined text-[15px] font-bold">send</span>
-                  <span>Transmitir Relatório</span>
-                </>
-              )}
-            </button>
-          </div>
+            </div>
+          )}
 
         </div>
 

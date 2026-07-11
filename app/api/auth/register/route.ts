@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+const DEFAULT_URL = 'https://bpfdfunkmndwviwfyovi.supabase.co';
+const DEFAULT_KEY = 'sb_publishable_CwjadnejjA816OL-wJO8QA_o_uowhOg';
+
 export async function POST(req: NextRequest) {
   try {
     const { email, password } = await req.json();
 
-    const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || DEFAULT_URL;
     const supabaseUrl = rawUrl ? rawUrl.replace(/\/rest\/v1\/?$/, '') : undefined;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || DEFAULT_KEY;
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl) {

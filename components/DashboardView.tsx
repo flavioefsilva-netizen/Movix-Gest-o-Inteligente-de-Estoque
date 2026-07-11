@@ -333,8 +333,9 @@ export default function DashboardView() {
                             selectDistributor(dist);
                             setIsRegisterModalOpen(true);
                           }}
-                          className="flex-grow bg-emerald-50 hover:bg-emerald-100 border border-emerald-400 text-emerald-700 font-extrabold py-2 rounded-xl text-[9px] uppercase tracking-wider transition-all shadow-sm flex items-center justify-center cursor-pointer z-10"
+                          className="flex-grow h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-[9px] uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-1 cursor-pointer z-10"
                         >
+                          <span className="material-symbols-outlined text-[11px] font-bold text-white">person_add</span>
                           Cadastrar Usuário
                         </button>
                         {userRole !== 'Gerencial' && (
@@ -344,10 +345,10 @@ export default function DashboardView() {
                               e.stopPropagation();
                               handleInitDelete(dist, distName);
                             }}
-                            className="p-2 border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center cursor-pointer transition-all shadow-sm z-10"
+                            className="h-8 w-8 border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center cursor-pointer transition-all shadow-sm z-10 shrink-0"
                             title="Excluir Distribuidor"
                           >
-                            <span className="material-symbols-outlined text-[9px]">delete</span>
+                            <span className="material-symbols-outlined text-[14px]">delete</span>
                           </button>
                         )}
                       </div>
@@ -369,7 +370,7 @@ export default function DashboardView() {
             {/* Header */}
             <div className="bg-slate-50 px-6 py-4.5 border-b border-gray-200 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined text-blue-600 text-xl font-bold">person_add</span>
+                <span className="material-symbols-outlined text-emerald-600 text-xl font-bold">person_add</span>
                 <div>
                   <h3 className="text-sm font-black text-slate-900 uppercase">
                     USUÁRIOS DE ({activeDistributorName})
@@ -553,7 +554,7 @@ export default function DashboardView() {
                 <button
                   type="submit"
                   disabled={regLoading}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md shadow-blue-500/10 flex items-center gap-2 cursor-pointer disabled:bg-blue-500"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-5 py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md shadow-emerald-500/10 flex items-center gap-2 cursor-pointer disabled:bg-emerald-500"
                 >
                   {regLoading ? (
                     <>

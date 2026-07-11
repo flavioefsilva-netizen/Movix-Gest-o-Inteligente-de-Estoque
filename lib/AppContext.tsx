@@ -490,8 +490,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isInventoryLocked, setInventoryLocked] = useState<boolean>(false);
   const [reportsTab, setReportsTab] = useState<'transports' | 'movements' | 'sobra_clientes' | 'contagem_doc' | 'saldo_loja' | 'contagem_loja' | 'saldo_vs_contagem'>('transports');
   const [telegramRecipients, setTelegramRecipients] = useState<TelegramRecipient[]>([
-    { id: '8987478627', name: 'Suporte Movix Central', checked: true },
-    { id: '1287498374', name: 'Logística Regional', checked: true },
+    { id: '8987478627', name: 'Suporte Movix Central (Usuário)', checked: true },
+    { id: '-1004383006162', name: 'Grupo de Monitoramento Movix (Grupo)', checked: true },
+    { id: '1287498374', name: 'Logística Regional', checked: false },
     { id: '5572834910', name: 'Gerente Operacional', checked: false }
   ]);
 
@@ -1057,8 +1058,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setTelegramRecipients(data.map(mapTelegramRecipientFromDB));
       } else {
         const defaults = [
-          { id: '8987478627', name: 'Suporte Movix Central', checked: true },
-          { id: '1287498374', name: 'Logística Regional', checked: true },
+          { id: '8987478627', name: 'Suporte Movix Central (Usuário)', checked: true },
+          { id: '-1004383006162', name: 'Grupo de Monitoramento Movix (Grupo)', checked: true },
+          { id: '1287498374', name: 'Logística Regional', checked: false },
           { id: '5572834910', name: 'Gerente Operacional', checked: false }
         ];
         try {

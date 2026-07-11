@@ -42,20 +42,50 @@ export default function Header() {
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
+  // Sync avatar from local storage and remote Supabase auth user metadata
   useEffect(() => {
-    if (userEmail) {
+    let active = true;
+    const loadAvatar = async () => {
+      if (!userEmail) {
+        setProfileAvatar(null);
+        return;
+      }
+
+      // 1. Try local storage first for instant load
       const saved = localStorage.getItem(`movix_avatar_${userEmail.toLowerCase()}`);
       if (saved) {
-        setTimeout(() => {
-          setProfileAvatar(saved);
-        }, 0);
-      } else {
-        setTimeout(() => {
-          setProfileAvatar(null);
-        }, 0);
+        if (active) setProfileAvatar(saved);
       }
+
+      // 2. Fetch from Supabase Auth metadata to synchronize across different devices
+      if (supabase) {
+        try {
+          const { data: { user }, error } = await supabase.auth.getUser();
+          if (!error && user && user.user_metadata?.avatar_url) {
+            const remoteAvatar = user.user_metadata.avatar_url;
+            if (active) {
+              setProfileAvatar(remoteAvatar);
+              // Save to localStorage so it is instantly available next time on this machine
+              localStorage.setItem(`movix_avatar_${userEmail.toLowerCase()}`, remoteAvatar);
+            }
+          }
+        } catch (err) {
+          console.warn('[Header] Error fetching avatar from Supabase:', err);
+        }
+      }
+    };
+
+    loadAvatar();
+    return () => {
+      active = false;
+    };
+  }, [userEmail, dbStatus]);
+
+  const handleAvatarClick = () => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setIsSettingsOpen(!isSettingsOpen);
     }
-  }, [userEmail]);
+  };
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -199,7 +229,11 @@ export default function Header() {
       <div className="flex items-center space-x-3">
         {/* User profile block */}
         <div className="flex items-center space-x-3 border-l border-gray-150 pl-4 relative">
-          <div className="w-8 h-8 rounded-full bg-blue-600/10 flex items-center justify-center text-blue-600 font-extrabold text-xs shrink-0 overflow-hidden border border-gray-200">
+          <div 
+            onClick={handleAvatarClick}
+            className="w-8 h-8 rounded-full bg-blue-600/10 flex items-center justify-center text-blue-600 font-extrabold text-xs shrink-0 overflow-hidden border border-gray-200 cursor-pointer md:cursor-default"
+            title="Configurações de Perfil (Clique para abrir no celular)"
+          >
             {profileAvatar ? (
               <img src={profileAvatar} alt="Foto de perfil" className="w-full h-full object-cover" />
             ) : (

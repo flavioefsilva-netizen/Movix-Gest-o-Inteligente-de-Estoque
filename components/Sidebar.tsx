@@ -26,10 +26,21 @@ export default function Sidebar() {
   const [isActionsOpen, setIsActionsOpen] = useState(false);
   const [isCadastrosOpen, setIsCadastrosOpen] = useState(false);
   const [isReportsOpen, setIsReportsOpen] = useState(false);
+  const [isOverviewOpen, setIsOverviewOpen] = useState(true);
 
   const actionsRef = useRef<HTMLDivElement>(null);
   const cadastrosRef = useRef<HTMLDivElement>(null);
   const reportsRef = useRef<HTMLDivElement>(null);
+  const overviewRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOverviewOpen) {
+      const timer = setTimeout(() => {
+        overviewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isOverviewOpen]);
 
   useEffect(() => {
     if (isActionsOpen) {
@@ -92,7 +103,7 @@ export default function Sidebar() {
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
                 <h1 className="text-sm font-black tracking-wider text-slate-800 leading-none">MOVIX</h1>
-                <span className="text-[9px] font-extrabold text-slate-700 bg-slate-200/50 px-1 rounded-sm leading-none py-0.5">V 2.1</span>
+                <span className="text-[9px] font-extrabold text-slate-700 bg-slate-200/50 px-1 rounded-sm leading-none py-0.5">V 3.0</span>
               </div>
               <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-1">LOGISTICS SYSTEM</span>
             </div>
@@ -179,7 +190,7 @@ export default function Sidebar() {
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5">
             <span className="text-[18px] font-black tracking-wider text-blue-600 leading-none">MOVIX</span>
-            <span className="text-[9px] font-extrabold text-blue-700 bg-blue-50 border border-blue-200 px-1 rounded-sm leading-none py-0.5">V 2.1</span>
+            <span className="text-[9px] font-extrabold text-blue-700 bg-blue-50 border border-blue-200 px-1 rounded-sm leading-none py-0.5">V 3.0</span>
           </div>
           <span className="text-[9px] font-bold text-gray-700 tracking-tight mt-1 leading-tight">
             Gestão Inteligente de Estoque
@@ -193,74 +204,92 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6 space-y-6">
-        <div className="bg-gray-100 border border-gray-200 rounded-xl p-3 text-slate-800">
-          <div className="bg-yellow-100 rounded-lg px-2.5 py-1.5 flex items-center gap-2 mb-2.5">
-            <span className="material-symbols-outlined text-yellow-700 text-sm font-bold">visibility</span>
-            <p className="text-[10px] font-bold text-yellow-700 uppercase tracking-widest">Visão Geral</p>
+        <div ref={overviewRef} className="bg-gray-100 border border-gray-200 rounded-xl p-3 text-slate-800">
+          <div 
+            onClick={() => {
+              const nextVal = !isOverviewOpen;
+              setIsOverviewOpen(nextVal);
+              if (nextVal) {
+                setIsActionsOpen(false);
+                setIsCadastrosOpen(false);
+                setIsReportsOpen(false);
+              }
+            }}
+            className="bg-yellow-100 rounded-lg px-2.5 py-1.5 flex items-center justify-between cursor-pointer select-none hover:bg-yellow-200/80 transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-yellow-700 text-sm font-bold">visibility</span>
+              <p className="text-[10px] font-bold text-yellow-700 uppercase tracking-widest">Visão Geral</p>
+            </div>
+            <span className="material-symbols-outlined text-yellow-700 text-[16px] font-bold">
+              {isOverviewOpen ? 'expand_less' : 'expand_more'}
+            </span>
           </div>
-          <div className="space-y-1">
-            {userRole !== 'Administrativo' && userRole !== 'Logístico' && userRole !== 'Conferencia' && (
+          {isOverviewOpen && (
+            <div className="space-y-1 mt-2.5">
+              {userRole !== 'Administrativo' && userRole !== 'Logístico' && userRole !== 'Conferencia' && (
+                <button
+                  onClick={() => {
+                    setActiveView('dashboard');
+                    setSelectedAction(null);
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                    activeView === 'dashboard' && !selectedAction
+                      ? 'bg-yellow-400 text-slate-950 font-extrabold shadow-sm border border-yellow-500'
+                      : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[20px]">grid_view</span>
+                  <span>Painel Adm</span>
+                </button>
+              )}
+
               <button
                 onClick={() => {
-                  setActiveView('dashboard');
+                  setActiveView('movements');
                   setSelectedAction(null);
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  activeView === 'dashboard' && !selectedAction
+                  activeView === 'movements' && !selectedAction
                     ? 'bg-yellow-400 text-slate-950 font-extrabold shadow-sm border border-yellow-500'
                     : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
                 }`}
               >
-                <span className="material-symbols-outlined text-[20px]">grid_view</span>
-                <span>Painel Adm</span>
+                <span className="material-symbols-outlined text-[20px]">swap_horiz</span>
+                <span>Movimentações</span>
               </button>
-            )}
 
-            <button
-              onClick={() => {
-                setActiveView('movements');
-                setSelectedAction(null);
-              }}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                activeView === 'movements' && !selectedAction
-                  ? 'bg-yellow-400 text-slate-950 font-extrabold shadow-sm border border-yellow-500'
-                  : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[20px]">swap_horiz</span>
-              <span>Movimentações</span>
-            </button>
+              <button
+                onClick={() => {
+                  setActiveView('logistic_dashboard');
+                  setSelectedAction(null);
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  activeView === 'logistic_dashboard' && !selectedAction
+                    ? 'bg-yellow-400 text-slate-950 font-extrabold shadow-sm border border-yellow-500'
+                    : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px]">dashboard</span>
+                <span>Dashboard</span>
+              </button>
 
-            <button
-              onClick={() => {
-                setActiveView('logistic_dashboard');
-                setSelectedAction(null);
-              }}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                activeView === 'logistic_dashboard' && !selectedAction
-                  ? 'bg-yellow-400 text-slate-950 font-extrabold shadow-sm border border-yellow-500'
-                  : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[20px]">dashboard</span>
-              <span>Dashboard</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveView('suporte');
-                setSelectedAction(null);
-              }}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-                activeView === 'suporte' && !selectedAction
-                  ? 'bg-yellow-400 text-slate-950 font-extrabold shadow-sm border border-yellow-500'
-                  : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[20px]">support_agent</span>
-              <span>Suporte</span>
-            </button>
-          </div>
+              <button
+                onClick={() => {
+                  setActiveView('suporte');
+                  setSelectedAction(null);
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+                  activeView === 'suporte' && !selectedAction
+                    ? 'bg-yellow-400 text-slate-950 font-extrabold shadow-sm border border-yellow-500'
+                    : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px]">support_agent</span>
+                <span>Suporte</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* AÇÕES */}
@@ -272,6 +301,7 @@ export default function Sidebar() {
               if (nextVal) {
                 setIsCadastrosOpen(false);
                 setIsReportsOpen(false);
+                setIsOverviewOpen(false);
               }
             }}
             className="bg-blue-100 rounded-lg px-2.5 py-1.5 flex items-center justify-between cursor-pointer select-none hover:bg-blue-200/80 transition-all"
@@ -342,6 +372,7 @@ export default function Sidebar() {
                 if (nextVal) {
                   setIsActionsOpen(false);
                   setIsReportsOpen(false);
+                  setIsOverviewOpen(false);
                   setActiveView('cadastros');
                   setActiveCadastroTab('produtos');
                   setSelectedAction(null);
@@ -402,6 +433,7 @@ export default function Sidebar() {
               if (nextVal) {
                 setIsActionsOpen(false);
                 setIsCadastrosOpen(false);
+                setIsOverviewOpen(false);
                 setActiveView('reports');
                 setReportsTab('transports');
                 setSelectedAction(null);

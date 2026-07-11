@@ -25,15 +25,9 @@ export async function POST(req: NextRequest) {
       token = token.trim().replace(/^['"]|['"]$/g, '');
     }
 
-    // If there is no real token, we will simulate a highly detailed response so that
-    // the user doesn't get blocked in preview, but also alert them.
+    // Default to the provided stable BOT_TOKEN if none is found in the environment variables
     if (!token || token.trim() === '' || token === 'undefined') {
-      return NextResponse.json({
-        success: true,
-        simulated: true,
-        message: 'Modo de demonstração: Token do Telegram não configurado no .env. Mas a mensagem foi gerada e o envio simulado com sucesso!',
-        contentSent: message,
-      });
+      token = '8969568321:AAH66If1hS58zFugfwj-EiFK7HeGWgQ4JUc';
     }
 
     const results = [];
