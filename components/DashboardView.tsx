@@ -178,10 +178,10 @@ export default function DashboardView() {
               setNewDistributorCnpj('');
               setIsCreatingDistributor(false);
               
-              // Switch to the newly created distributor, go to Central de Cadastros, and show Products tab
+              // Switch to the newly created distributor, go to Central de Cadastros, and show Clientes tab
               selectDistributor(newId);
               setActiveView('cadastros');
-              setActiveCadastroTab('produtos');
+              setActiveCadastroTab('clientes');
             }
           }} className="space-y-4">
             <div className="space-y-1.5">

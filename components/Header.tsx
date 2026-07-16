@@ -64,7 +64,8 @@ export default function Header() {
       // 2. Fetch from Supabase Auth metadata to synchronize across different devices
       if (supabase) {
         try {
-          const { data: { user }, error } = await supabase.auth.getUser();
+          const { data, error } = await supabase.auth.getUser();
+          const user = data?.user;
           if (!error && user && user.user_metadata?.avatar_url) {
             const remoteAvatar = user.user_metadata.avatar_url;
             if (active) {

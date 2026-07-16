@@ -51,6 +51,7 @@ export default function CadastrosView() {
 
   // Search Filter state
   const [searchTerm, setSearchTerm] = useState('');
+  const [clientFormMode, setClientFormMode] = useState<'none' | 'new' | 'mass'>('none');
   const [prevTab, setPrevTab] = useState(activeCadastroTab);
   if (activeCadastroTab !== prevTab) {
     setPrevTab(activeCadastroTab);
@@ -518,6 +519,7 @@ export default function CadastrosView() {
       if (res.success) {
         setSuccessMsg('cadastro realizado com sucesso!');
         clearAllForms();
+        setClientFormMode('none');
       } else {
         setErrorMsg(res.error || 'Erro ao atualizar dados do cliente.');
       }
@@ -540,6 +542,7 @@ export default function CadastrosView() {
       if (res.success) {
         setSuccessMsg('cadastro realizado com sucesso!');
         clearAllForms();
+        setClientFormMode('none');
       } else {
         setErrorMsg(res.error || 'Erro ao realizar o cadastro do cliente.');
       }
@@ -685,6 +688,7 @@ export default function CadastrosView() {
   };
 
   const startEditClient = (c: Client) => {
+    setClientFormMode('new');
     setEditingId(c.id);
     setCliRazao(c.razaoSocial);
     setCliCnpj(c.cnpj);
@@ -971,6 +975,7 @@ export default function CadastrosView() {
 
           if (importedCount > 0) {
             setSuccessMsg(`${importedCount} clientes importados com sucesso!${errorCount > 0 ? ` (${errorCount} erros)` : ''}`);
+            setClientFormMode('none');
           } else {
             setErrorMsg(`Nenhum cliente pôde ser importado. Motivo: ${lastError || 'Dados inválidos.'}`);
           }
@@ -1060,8 +1065,8 @@ export default function CadastrosView() {
         <div className="bg-white border border-gray-200 rounded-xl p-2.5 shadow-3xs">
           <div className="flex flex-wrap items-center gap-1.5">
             {[
-              { id: 'produtos' as const, label: 'Produtos', icon: 'inventory_2', color: 'text-blue-600', activeBg: 'bg-blue-50 text-blue-700 font-bold border-blue-200' },
               { id: 'clientes' as const, label: 'Clientes', icon: 'groups', color: 'text-emerald-600', activeBg: 'bg-emerald-50 text-emerald-700 font-bold border-emerald-200' },
+              { id: 'produtos' as const, label: 'Produtos', icon: 'inventory_2', color: 'text-blue-600', activeBg: 'bg-blue-50 text-blue-700 font-bold border-blue-200' },
               { id: 'fornecedores' as const, label: 'Fornecedores', icon: 'store', color: 'text-green-800', activeBg: 'bg-green-100 text-green-800 font-bold border-green-800' },
               { id: 'funcionarios' as const, label: 'Funcionários', icon: 'badge', color: 'text-purple-600', activeBg: 'bg-purple-50 text-purple-700 font-bold border-purple-200' },
               { id: 'veiculos' as const, label: 'Veículos', icon: 'local_shipping', color: 'text-red-600', activeBg: 'bg-red-50 text-red-700 font-bold border-red-200' },
@@ -1093,10 +1098,11 @@ export default function CadastrosView() {
       </div>
 
       {/* Central Interactive Content Grid */}
-      <div className={activeCadastroTab === 'produtos' ? "flex flex-col lg:flex-row gap-6 items-stretch" : "grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch"}>
+      {activeCadastroTab !== 'clientes' && (
+        <div className={activeCadastroTab === 'produtos' ? "flex flex-col lg:flex-row gap-6 items-stretch" : "grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch"}>
         
         {/* LEFT QUADRANT: The Form controls */}
-        <div className={activeCadastroTab === 'produtos' ? "w-full lg:w-[28%] flex flex-col space-y-6 h-full" : `${activeCadastroTab === 'clientes' ? 'lg:col-span-7' : 'lg:col-span-4'} flex flex-col space-y-6 h-full`}>
+        <div className={activeCadastroTab === 'produtos' ? "w-full lg:w-[28%] flex flex-col space-y-6 h-full" : "lg:col-span-4 flex flex-col space-y-6 h-full"}>
           <div className={`bg-white border border-gray-200 rounded-2xl shadow-xs h-full flex flex-col overflow-hidden ${['veiculos', 'rotas_entrega', 'rotas_contagem'].includes(activeCadastroTab) ? 'justify-start' : 'justify-between'}`}>
             <div className={`${getThemeColors(activeCadastroTab).headerBg} px-6 py-4 border-b border-gray-150 flex items-center space-x-2.5`}>
               <span className={`material-symbols-outlined ${getThemeColors(activeCadastroTab).icon} text-xl font-bold`}>assignment</span>
@@ -1184,7 +1190,7 @@ export default function CadastrosView() {
           )}
 
           {/* 2. CLIENT FORM */}
-          {activeCadastroTab === 'clientes' && (
+          {(activeCadastroTab as string) === 'clientes' && (
             <form onSubmit={handleClientSubmit} className="space-y-4 text-[12px]">
               {/* Row 1: Matricula, CNPJ, Razão Social */}
               <div className="grid grid-cols-12 gap-4">
@@ -2084,10 +2090,10 @@ export default function CadastrosView() {
         ) : (
           <>
              {/* RIGHT QUADRANT: Upload em Massa for Clients OR Registered Report for others */}
-            <div className={`bg-white border border-gray-200 rounded-2xl shadow-xs ${activeCadastroTab === 'clientes' ? 'lg:col-span-5' : 'lg:col-span-8'} flex flex-col min-h-[460px] h-full overflow-hidden`}>
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-xs lg:col-span-8 flex flex-col min-h-[460px] h-full overflow-hidden">
               
               {/* A. CLIENTS: SHOW BATCH UPLOAD */}
-              {activeCadastroTab === 'clientes' && (
+              {(activeCadastroTab as string) === 'clientes' && (
                 <div className="flex flex-col h-full flex-grow">
                   <div className={`${getThemeColors('clientes').headerBg} px-6 py-4 border-b border-gray-150 flex items-center space-x-2.5 mb-4`}>
                     <span className={`material-symbols-outlined ${getThemeColors(activeCadastroTab).icon} text-xl font-bold`}>upload_file</span>
@@ -2238,16 +2244,6 @@ export default function CadastrosView() {
                     <span className="text-[9px] bg-slate-200/60 text-slate-650 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
                       Sincronizado p/ {activeDistributorName}
                     </span>
-                    
-                    {/* Planilha Modelo compact download button (70% reduced height, icon in front of text) */}
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadTemplate('fornecedores')}
-                      className="px-2.5 py-1 bg-green-50 hover:bg-green-100 border border-green-200 text-green-800 text-[9px] font-bold uppercase tracking-wider rounded flex items-center gap-1 transition-all active:scale-95"
-                    >
-                      <span className="material-symbols-outlined text-[12px] font-black">download</span>
-                      <span>Planilha Modelo</span>
-                    </button>
                   </div>
                 </div>
               )}
@@ -2566,6 +2562,7 @@ export default function CadastrosView() {
         )}
 
       </div>
+      )}
 
 
 
@@ -2573,17 +2570,437 @@ export default function CadastrosView() {
       {activeCadastroTab === 'clientes' && (
         <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm overflow-hidden">
         
-        <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-100 pb-4 mb-4 gap-4">
           <div className="flex items-center space-x-2.5">
             <span className="material-symbols-outlined text-emerald-600">list_alt</span>
             <h4 className="text-sm font-black text-slate-800 uppercase">
               Relatório de {activeCadastroTab} Cadastrados
             </h4>
           </div>
-          <span className="text-xs bg-emerald-600 text-white px-2.5 py-0.5 rounded font-bold uppercase tracking-wider">
-            {clients.length} registros
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setClientFormMode(prev => prev === 'new' ? 'none' : 'new')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all duration-200 shadow-3xs ${
+                clientFormMode === 'new'
+                  ? 'bg-emerald-700 text-white border border-emerald-800 scale-95 font-extrabold'
+                  : 'bg-emerald-500 hover:bg-emerald-600 text-white hover:shadow-xs'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[14px]">add_circle</span>
+              Novo Cadastro
+            </button>
+            <button
+              type="button"
+              onClick={() => setClientFormMode(prev => prev === 'mass' ? 'none' : 'mass')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all duration-200 shadow-3xs ${
+                clientFormMode === 'mass'
+                  ? 'bg-emerald-700 text-white border border-emerald-800 scale-95 font-extrabold'
+                  : 'bg-emerald-500 hover:bg-emerald-600 text-white hover:shadow-xs'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[14px]">upload_file</span>
+              Cadastro em Massa
+            </button>
+            <span className="text-xs bg-emerald-600 text-white px-2.5 py-1.5 rounded-lg font-bold uppercase tracking-wider ml-1">
+              {clients.length} registros
+            </span>
+          </div>
         </div>
+
+        {/* Overlay Novo Cadastro Form Modal */}
+        {clientFormMode === 'new' && (
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+            {/* Click backdrop to close */}
+            <div 
+              className="absolute inset-0" 
+              onClick={() => {
+                clearAllForms();
+                setClientFormMode('none');
+              }} 
+            />
+            
+            <div className="relative bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-gray-150 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden z-10">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-emerald-50/20">
+                <div className="flex items-center gap-2.5">
+                  <span className="material-symbols-outlined text-emerald-600 font-black">assignment</span>
+                  <h4 className="text-sm font-black text-slate-850 uppercase tracking-wider">
+                    {editingId ? 'Editar Cadastro de Cliente' : 'Novo Cadastro de Cliente'}
+                  </h4>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearAllForms();
+                    setClientFormMode('none');
+                  }}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-all active:scale-95 flex items-center justify-center"
+                >
+                  <span className="material-symbols-outlined text-xl font-bold">close</span>
+                </button>
+              </div>
+              
+              {/* Modal Body - Scrollable */}
+              <div className="p-6 overflow-y-auto space-y-4">
+                <form onSubmit={handleClientSubmit} className="space-y-4 text-[12px]">
+                  {/* Row 1: Matricula, CNPJ, Razão Social */}
+                  <div className="grid grid-cols-12 gap-4">
+                    {/* Matricula */}
+                    <div className="col-span-12 md:col-span-2 space-y-1">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">MATRÍCULA</label>
+                      <div className="w-full h-10 px-2 bg-green-50 border border-green-500 rounded-lg text-[12px] font-extrabold flex items-center text-green-600">
+                        {editingId ? clients.find(c => c.id === editingId)?.matricula : String(clients.length + 1).padStart(4, '0')}
+                      </div>
+                    </div>
+
+                    {/* CNPJ */}
+                    <div className="col-span-12 md:col-span-3 space-y-1">
+                      <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">CNPJ (14 números) *</label>
+                      <input
+                        ref={clientCnpjRef}
+                        type="text"
+                        value={cliCnpj}
+                        onChange={(e) => setCliCnpj(sanitizeDigits(e.target.value))}
+                        onBlur={() => handleCnpjBlur(cliCnpj, clientCnpjRef)}
+                        maxLength={14}
+                        placeholder="Somente números"
+                        className="w-full h-10 px-3 bg-gray-50 border border-gray-250 rounded-lg text-[12px] font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        required
+                      />
+                      {cnpjWarning && (
+                        <p className="text-[12px] font-bold text-rose-600 animate-pulse">{cnpjWarning}</p>
+                      )}
+                    </div>
+
+                    {/* Razão Social */}
+                    <div className="col-span-12 md:col-span-7 space-y-1">
+                      <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Razão Social *</label>
+                      <input
+                        type="text"
+                        value={cliRazao}
+                        onChange={(e) => setCliRazao(e.target.value)}
+                        className="w-full h-10 px-3 bg-gray-50 border border-gray-250 rounded-lg text-[12px] font-semibold focus:bg-white focus:outline-none"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 2: Nome, Sobrenome, Contato */}
+                  <div className="grid grid-cols-12 gap-4">
+                    {/* Nome Responsável */}
+                    <div className="col-span-12 md:col-span-4 space-y-1">
+                      <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Nome Responsável *</label>
+                      <input
+                        type="text"
+                        value={cliNome}
+                        onChange={(e) => setCliNome(e.target.value)}
+                        className="w-full h-10 px-3 bg-gray-50 border border-gray-250 rounded-lg text-[12px] font-semibold focus:bg-white"
+                        required
+                      />
+                    </div>
+
+                    {/* Sobrenome */}
+                    <div className="col-span-12 md:col-span-4 space-y-1">
+                      <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Sobrenome</label>
+                      <input
+                        type="text"
+                        value={cliSobrenome}
+                        onChange={(e) => setCliSobrenome(e.target.value)}
+                        className="w-full h-10 px-3 bg-gray-50 border border-gray-250 rounded-lg text-[12px] font-semibold focus:bg-white focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Contato */}
+                    <div className="col-span-12 md:col-span-4 space-y-1">
+                      <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Contato</label>
+                      <input
+                        type="text"
+                        value={cliContato}
+                        onChange={(e) => setCliContato(e.target.value)}
+                        className="w-full h-10 px-3 bg-gray-50 border border-gray-250 rounded-lg text-[12px] font-semibold focus:bg-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 3: Endereço (82%), Numero (18%) */}
+                  <div className="grid grid-cols-12 gap-4">
+                    {/* Endereço */}
+                    <div className="col-span-12 md:col-span-10 space-y-1">
+                      <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Endereço</label>
+                      <input
+                        type="text"
+                        value={cliEndereco}
+                        onChange={(e) => setCliEndereco(e.target.value)}
+                        className="w-full h-10 px-3 bg-gray-50 border border-gray-250 rounded-lg text-[12px] font-semibold focus:bg-white focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Numero */}
+                    <div className="col-span-12 md:col-span-2 space-y-1">
+                      <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Número</label>
+                      <input
+                        type="text"
+                        value={cliNumero}
+                        onChange={(e) => setCliNumero(e.target.value)}
+                        className="w-full h-10 px-3 bg-gray-50 border border-gray-250 rounded-lg text-[12px] font-semibold focus:bg-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 4: Bairro (35%), CEP (22%), Cidade (28%), Estado (15%) */}
+                  <div className="flex flex-col md:flex-row gap-4 w-full">
+                    {/* Bairro */}
+                    <div className="md:w-[35%] w-full space-y-1">
+                      <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Bairro</label>
+                      <input
+                        type="text"
+                        value={cliBairro}
+                        onChange={(e) => setCliBairro(e.target.value)}
+                        className="w-full h-10 px-3 bg-gray-50 border border-gray-250 rounded-lg text-[12px] font-semibold focus:bg-white focus:outline-none"
+                      />
+                    </div>
+
+                    {/* CEP */}
+                    <div className="md:w-[22%] w-full space-y-1">
+                      <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">CEP</label>
+                      <input
+                        type="text"
+                        value={cliCep}
+                        onChange={(e) => setCliCep(e.target.value)}
+                        className="w-full h-10 px-3 bg-gray-50 border border-gray-250 rounded-lg text-[12px] font-semibold focus:bg-white focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Cidade with suggestions dropdown */}
+                    <div className="md:w-[28%] w-full space-y-1 relative">
+                      <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Cidade</label>
+                      <input
+                        type="text"
+                        value={cliCidade}
+                        onChange={(e) => {
+                          setCliCidade(e.target.value);
+                          handleCityInput(e.target.value, cliEstado);
+                          setShowCitySuggestions(true);
+                        }}
+                        onFocus={() => {
+                          handleCityInput(cliCidade, cliEstado);
+                          setShowCitySuggestions(true);
+                        }}
+                        placeholder="Digite..."
+                        required
+                        className="w-full h-10 px-3 bg-gray-50 border border-gray-250 rounded-lg text-[12px] font-semibold focus:bg-white focus:outline-none"
+                      />
+                      {showCitySuggestions && activeCitySuggestions.length > 0 && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setShowCitySuggestions(false)} />
+                          <div className="absolute left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20 divide-y divide-gray-100">
+                            {activeCitySuggestions.map((cit, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => {
+                                  setCliCidade(cit);
+                                  setShowCitySuggestions(false);
+                                }}
+                                className="w-full text-left px-3 py-2 text-[12px] text-gray-700 hover:bg-gray-50"
+                              >
+                                {cit}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Estado */}
+                    <div className="md:w-[15%] w-full space-y-1">
+                      <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Estado</label>
+                      <select
+                        value={cliEstado}
+                        onChange={(e) => {
+                          setCliEstado(e.target.value);
+                          handleCityInput('', e.target.value);
+                        }}
+                        className="w-full h-10 px-3 bg-gray-50 border border-gray-250 rounded-lg text-[12px] font-bold focus:bg-white cursor-pointer text-slate-800"
+                        required
+                      >
+                        <option value="" className="text-[12px]">UF...</option>
+                        {BRAZILIAN_STATES.map(st => (
+                          <option key={st} value={st} className="text-[12px]">{st}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Row 5: Rota de Entrega, Rota de Contagem, Botão Concluir Cadastro */}
+                  <div className="flex flex-col md:flex-row gap-4 w-full items-end pt-2">
+                    {/* Rota de Entrega */}
+                    <div className="flex-1 space-y-1">
+                      <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Rota de Entrega *</label>
+                      <select
+                        value={cliRotaEnt}
+                        onChange={(e) => setCliRotaEnt(e.target.value)}
+                        className="w-full h-10 px-3 bg-gray-50 border border-gray-250 rounded-lg text-[12px] font-bold focus:bg-white text-slate-800 cursor-pointer"
+                        required
+                      >
+                        <option value="" className="text-[12px]">Selecione a Rota de Entrega...</option>
+                        {(deliveryRoutes || []).map((r) => (
+                          <option key={r.id} value={r.numeroRota} className="text-[12px]">
+                            Rota {r.numeroRota} - {r.cidade} ({r.bairroRegiao})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Rota de Contagem */}
+                    <div className="flex-1 space-y-1">
+                      <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Rota de Contagem *</label>
+                      <select
+                        value={cliRotaCont}
+                        onChange={(e) => setCliRotaCont(e.target.value)}
+                        className="w-full h-10 px-3 bg-gray-50 border border-gray-250 rounded-lg text-[12px] font-bold focus:bg-white text-slate-800 cursor-pointer"
+                        required
+                      >
+                        <option value="" className="text-[12px]">Selecione a Rota de Contagem...</option>
+                        {(countingRoutes || []).map((r) => (
+                          <option key={r.id} value={r.numeroRota} className="text-[12px]">
+                            Rota {r.numeroRota} - {r.cidade} ({r.bairroRegiao})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex-1 flex gap-2">
+                      <button
+                        type="submit"
+                        className="flex-1 h-10 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold uppercase rounded-lg shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">save</span>
+                        <span>{editingId ? 'Salvar Edição' : 'Concluir Cadastro'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          clearAllForms();
+                          setClientFormMode('none');
+                        }}
+                        className="px-4 h-10 border border-gray-250 hover:bg-gray-50 rounded-lg text-[10px] font-bold uppercase whitespace-nowrap cursor-pointer text-slate-700"
+                      >
+                        {editingId ? 'Cancelar' : 'Fechar'}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Overlay Cadastro em Massa Upload Modal */}
+        {clientFormMode === 'mass' && (
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+            {/* Click backdrop to close */}
+            <div 
+              className="absolute inset-0" 
+              onClick={() => setClientFormMode('none')} 
+            />
+            
+            <div className="relative bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-gray-150 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden z-10">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-emerald-50/20">
+                <div className="flex items-center gap-2.5">
+                  <span className="material-symbols-outlined text-emerald-600 font-black">upload_file</span>
+                  <h4 className="text-sm font-black text-slate-850 uppercase tracking-wider">
+                    Cadastro de Clientes em Massa
+                  </h4>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setClientFormMode('none')}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-all active:scale-95 flex items-center justify-center"
+                >
+                  <span className="material-symbols-outlined text-xl font-bold">close</span>
+                </button>
+              </div>
+              
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto space-y-4">
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Carregue registros múltiplos instantaneamente de forma segura. Baixe a planilha padrão correspondente e envie abaixo.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Box Upload */}
+                  <div className="border-2 border-dashed border-gray-250 bg-gray-50/50 rounded-xl p-6 flex flex-col items-center justify-center text-center hover:border-emerald-300 hover:bg-emerald-50/10 transition-all duration-200">
+                    <span className="material-symbols-outlined text-gray-400 text-4xl mb-2">cloud_upload</span>
+                    <p className="text-xs font-bold text-slate-700">Importar Planilha (CSV / XLSX)</p>
+                    <p className="text-[10px] text-gray-400 mt-1">Solte seu arquivo ou clique para selecionar</p>
+                    
+                    <input
+                      type="file"
+                      id="batch-file-picker-inline"
+                      className="hidden"
+                      onChange={(e) => handleFileUpload(e, activeCadastroTab)}
+                      accept=".xlsx, .xls, .csv"
+                    />
+                    
+                    <label
+                      htmlFor="batch-file-picker-inline"
+                      className="mt-4 px-4 py-2 border font-bold text-[10px] rounded-lg tracking-wide uppercase cursor-pointer transition-colors border-emerald-200 hover:bg-emerald-100/40 text-emerald-700"
+                    >
+                      Selecionar Arquivo
+                    </label>
+                  </div>
+
+                  {/* Download and templates column */}
+                  <div className="flex flex-col justify-center space-y-4">
+                    {/* Download link mockup */}
+                    <div className="p-3 bg-slate-50 rounded-xl flex items-center justify-between border border-slate-100 hover:border-emerald-200 transition-all">
+                      <div className="flex items-center space-x-2.5">
+                        <span 
+                          className="material-symbols-outlined text-emerald-600 hover:text-emerald-850 cursor-pointer text-xl font-extrabold select-none transition-all hover:scale-110"
+                          onClick={() => handleDownloadTemplate('clientes')}
+                          title="Baixar Modelo"
+                          style={{ fontSize: '24px' }}
+                        >
+                          download
+                        </span>
+                        <span className="text-xs font-semibold text-slate-750">modelo_importacao_clientes.xlsx</span>
+                      </div>
+                    </div>
+
+                    {/* Test Data spreadsheet for clients */}
+                    <div className="p-3 bg-emerald-50/50 rounded-xl flex items-center justify-between border border-emerald-100/80 hover:border-emerald-300 transition-all">
+                      <div className="flex items-center space-x-2.5">
+                        <span 
+                          className="material-symbols-outlined text-emerald-600 hover:text-emerald-850 cursor-pointer text-xl font-extrabold select-none transition-all hover:scale-110"
+                          onClick={generateClientTestExcel}
+                          title="Baixar"
+                          style={{ fontSize: '24px' }}
+                        >
+                          download
+                        </span>
+                        <span className="text-xs font-semibold text-slate-700 font-bold">planilha_teste_clientes.xlsx</span>
+                      </div>
+                      <div className="flex items-center space-x-3 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={generateClientTestExcel}
+                          className="p-1 text-emerald-700 hover:bg-emerald-100 rounded flex items-center justify-center transition-all"
+                          title="Atualizar"
+                        >
+                          <span className="material-symbols-outlined text-[16px] font-bold">refresh</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Dynamic tables conditional view */}
         <div className="overflow-x-auto min-h-[160px]">

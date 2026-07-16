@@ -561,8 +561,12 @@ export default function MovementsView() {
     }
 
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('inv_saved_contagens');
-      localStorage.removeItem('inv_saved_date');
+      try {
+        localStorage.removeItem('inv_saved_contagens');
+        localStorage.removeItem('inv_saved_date');
+      } catch (err) {
+        console.warn('Unable to remove item from localStorage:', err);
+      }
     }
 
     alert('Inventário registrado com sucesso! Os saldos físicos foram atualizados no sistema.');
@@ -573,8 +577,12 @@ export default function MovementsView() {
 
   const handleSaveAndExit = () => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('inv_saved_contagens', JSON.stringify(contagens));
-      localStorage.setItem('inv_saved_date', invDate);
+      try {
+        localStorage.setItem('inv_saved_contagens', JSON.stringify(contagens));
+        localStorage.setItem('inv_saved_date', invDate);
+      } catch (err) {
+        console.warn('Unable to write to localStorage:', err);
+      }
     }
     setIsRegistrarAjusteOpen(false);
     setActiveView('movements');
@@ -2802,8 +2810,12 @@ export default function MovementsView() {
                     });
                     setContagens(initialContagens);
                     if (typeof window !== 'undefined') {
-                      localStorage.setItem('inv_saved_contagens', JSON.stringify(initialContagens));
-                      localStorage.setItem('inv_saved_date', new Date().toISOString().split('T')[0]);
+                      try {
+                        localStorage.setItem('inv_saved_contagens', JSON.stringify(initialContagens));
+                        localStorage.setItem('inv_saved_date', new Date().toISOString().split('T')[0]);
+                      } catch (err) {
+                        console.warn('Unable to write to localStorage:', err);
+                      }
                     }
                     setIsAnalyzed(false);
                     setInvResponsible(getLoggedInUserName() || 'Marta TI');
@@ -3183,8 +3195,12 @@ export default function MovementsView() {
                   
                   // Clear active inventory details from storage
                   if (typeof window !== 'undefined') {
-                    localStorage.removeItem('inv_saved_contagens');
-                    localStorage.removeItem('inv_saved_date');
+                    try {
+                      localStorage.removeItem('inv_saved_contagens');
+                      localStorage.removeItem('inv_saved_date');
+                    } catch (err) {
+                      console.warn('Unable to remove items from localStorage:', err);
+                    }
                   }
                   
                   // Increment document number automatically to prevent re-editing the eliminated doc

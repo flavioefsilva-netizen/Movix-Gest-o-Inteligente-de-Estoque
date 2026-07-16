@@ -529,11 +529,19 @@ export default function SuporteView() {
 
   // Sync state to local storage
   useEffect(() => {
-    localStorage.setItem('isAutoUpdateActive', String(isAutoUpdateActive));
+    try {
+      localStorage.setItem('isAutoUpdateActive', String(isAutoUpdateActive));
+    } catch (err) {
+      console.warn('Unable to write isAutoUpdateActive to localStorage:', err);
+    }
   }, [isAutoUpdateActive]);
 
   useEffect(() => {
-    localStorage.setItem('autoUpdateTime', autoUpdateTime);
+    try {
+      localStorage.setItem('autoUpdateTime', autoUpdateTime);
+    } catch (err) {
+      console.warn('Unable to write autoUpdateTime to localStorage:', err);
+    }
   }, [autoUpdateTime]);
 
   // Interval-based automatic execution check (runs every 10 seconds when enabled)

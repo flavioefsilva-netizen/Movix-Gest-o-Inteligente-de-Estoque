@@ -485,7 +485,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userDistributorId, setUserDistributorId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<'dashboard' | 'movements' | 'cadastros' | 'reports' | 'logistic_dashboard' | 'suporte'>('dashboard');
-  const [activeCadastroTab, setActiveCadastroTab] = useState<'produtos' | 'clientes' | 'fornecedores' | 'funcionarios' | 'veiculos' | 'rotas_entrega' | 'rotas_contagem'>('produtos');
+  const [activeCadastroTab, setActiveCadastroTab] = useState<'produtos' | 'clientes' | 'fornecedores' | 'funcionarios' | 'veiculos' | 'rotas_entrega' | 'rotas_contagem'>('clientes');
   const [selectedAction, setSelectedAction] = useState<string | null>(null);
   const [isInventoryLocked, setInventoryLocked] = useState<boolean>(false);
   const [reportsTab, setReportsTab] = useState<'transports' | 'movements' | 'sobra_clientes' | 'contagem_doc' | 'saldo_loja' | 'contagem_loja' | 'saldo_vs_contagem'>('transports');
@@ -567,10 +567,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // SYNC ACTION HELPER WRAPPERS
   // ==========================================
 
-  const loadDistributors = async () => {
+  const loadDistributors = async (): Promise<boolean> => {
     if (!supabase) {
       setDbStatus('disconnected');
-      return;
+      return false;
     }
     try {
       const { data, error } = await supabase.from('distributors').select('*');
@@ -579,12 +579,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           console.warn('[Supabase] Tabela "distributors" não existe. Usando local storage.');
           setDbStatus('error');
           setDbErrorMessage('A tabela "distributors" não existe no banco de dados. Por favor, crie as tabelas executando o script "supabase_schema.sql" no editor de SQL do Supabase.');
+        } else if (error.message?.includes('Failed to fetch') || error.message?.includes('fetch') || error.message?.includes('network') || error.message?.includes('NetworkError')) {
+          console.warn('[Supabase] Conexão indisponível ou offline:', error.message);
+          setDbStatus('disconnected');
+          setDbErrorMessage(undefined);
         } else {
           console.error('[Supabase] Erro ao carregar distribuidores:', error);
           setDbStatus('error');
           setDbErrorMessage(error.message);
         }
-        return;
+        return false;
       }
       if (data && data.length > 0) {
         const mapped = data.map(d => ({ id: d.id, name: d.name, cnpj: d.cnpj || undefined }));
@@ -594,10 +598,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         await supabase.from('distributors').upsert(defaultDist);
         setDistributors([defaultDist]);
       }
+      return true;
     } catch (e: any) {
-      console.error('[Supabase] Falha ao carregar distribuidores:', e);
-      setDbStatus('error');
-      setDbErrorMessage(e?.message || String(e));
+      const msg = e?.message || String(e);
+      if (msg.includes('Failed to fetch') || msg.includes('fetch') || msg.includes('network') || msg.includes('NetworkError')) {
+        console.warn('[Supabase] Conexão indisponível ou offline:', msg);
+        setDbStatus('disconnected');
+        setDbErrorMessage(undefined);
+      } else {
+        console.error('[Supabase] Falha ao carregar distribuidores:', e);
+        setDbStatus('error');
+        setDbErrorMessage(msg);
+      }
+      return false;
     }
   };
 
@@ -949,12 +962,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (errors.length > 0) {
         console.warn('[Supabase] Alguns erros ao carregar tabelas para o distribuidor:', dist, errors);
-        setDbStatus('error');
-        const hasRelationError = errors.some(e => e && (e.code === '42P01' || e.message?.includes('relation') || e.message?.includes('does not exist')));
-        if (hasRelationError) {
-          setDbErrorMessage('Uma ou mais tabelas do banco de dados não existem. Por favor, certifique-se de executar o script "supabase_schema.sql" no painel SQL do seu projeto Supabase para criar as tabelas.');
+        const hasNetworkError = errors.some(e => e && (e.message?.includes('Failed to fetch') || e.message?.includes('fetch') || e.message?.includes('network') || e.message?.includes('NetworkError')));
+        if (hasNetworkError) {
+          setDbStatus('disconnected');
+          setDbErrorMessage(undefined);
         } else {
-          setDbErrorMessage(errors.map(e => e?.message || '').join(' | '));
+          setDbStatus('error');
+          const hasRelationError = errors.some(e => e && (e.code === '42P01' || e.message?.includes('relation') || e.message?.includes('does not exist')));
+          if (hasRelationError) {
+            setDbErrorMessage('Uma ou mais tabelas do banco de dados não existem. Por favor, certifique-se de executar o script "supabase_schema.sql" no painel SQL do seu projeto Supabase para criar as tabelas.');
+          } else {
+            setDbErrorMessage(errors.map(e => e?.message || '').join(' | '));
+          }
         }
       } else {
         setDbStatus('connected');
@@ -1030,11 +1049,54 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }));
 
     } catch (error: any) {
+      const msg = error?.message || String(error);
       console.warn(`Failed to load data from Supabase for distributor ${dist}:`, error);
       if (!silent) {
-        setDbStatus('error');
-        setDbErrorMessage(error?.message || String(error));
+        if (msg.includes('Failed to fetch') || msg.includes('fetch') || msg.includes('network') || msg.includes('NetworkError')) {
+          setDbStatus('disconnected');
+          setDbErrorMessage(undefined);
+        } else {
+          setDbStatus('error');
+          setDbErrorMessage(msg);
+        }
       }
+      // Populate local state for the distributor with default mock dataset if empty, ensuring no blank screens
+      setDistributorStates(prev => {
+        const existing = prev[dist];
+        if (existing && existing.products && existing.products.length > 0) {
+          return prev;
+        }
+        const getSeedId = (originalId: string) => dist === 'A' ? originalId : `${originalId}_${dist}`;
+        return {
+          ...prev,
+          [dist]: {
+            products: INITIAL_PRODUCTS.map(p => ({ ...p, id: getSeedId(p.id) })),
+            clients: INITIAL_CLIENTS.map(c => {
+              const mappedBalances: Record<string, number> = {};
+              if (c.productBalances) {
+                Object.entries(c.productBalances).forEach(([key, val]) => {
+                  mappedBalances[getSeedId(key)] = val;
+                });
+              }
+              return {
+                ...c,
+                id: getSeedId(c.id),
+                productBalances: mappedBalances
+              };
+            }),
+            suppliers: INITIAL_SUPPLIERS.map(s => ({ ...s, id: getSeedId(s.id) })),
+            employees: INITIAL_EMPLOYEES.map(e => ({ ...e, id: getSeedId(e.id) })),
+            vehicles: INITIAL_VEHICLES.map(v => ({ ...v, id: getSeedId(v.id) })),
+            transports: INITIAL_TRANSPORTS.map(t => ({ ...t, id: getSeedId(t.id) })),
+            activeTransports: [],
+            deliveryRoutes: INITIAL_DELIVERY_ROUTES.map(r => ({ ...r, id: getSeedId(r.id) })),
+            countingRoutes: INITIAL_COUNTING_ROUTES.map(r => ({ ...r, id: getSeedId(r.id) })),
+            movementsHistory: [],
+            sobraClientes: [],
+            countDocuments: [],
+          }
+        };
+      });
     } finally {
       if (!silent) {
         setIsLoading(false);
@@ -1180,18 +1242,65 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
+      let isConnected = true;
       if (!silent) {
-        await loadDistributors();
+        isConnected = await loadDistributors();
       }
-      await loadDataForDistributor(distId, silent);
-      if (!silent) {
-        await loadTelegramRecipients();
+      if (isConnected) {
+        await loadDataForDistributor(distId, silent);
+        if (!silent) {
+          await loadTelegramRecipients();
+        }
+      } else {
+        // Safe offline fallback in case distributors couldn't be loaded
+        setDistributorStates(prev => {
+          const existing = prev[distId];
+          if (existing && existing.products && existing.products.length > 0) {
+            return prev;
+          }
+          const getSeedId = (originalId: string) => distId === 'A' ? originalId : `${originalId}_${distId}`;
+          return {
+            ...prev,
+            [distId]: {
+              products: INITIAL_PRODUCTS.map(p => ({ ...p, id: getSeedId(p.id) })),
+              clients: INITIAL_CLIENTS.map(c => {
+                const mappedBalances: Record<string, number> = {};
+                if (c.productBalances) {
+                  Object.entries(c.productBalances).forEach(([key, val]) => {
+                    mappedBalances[getSeedId(key)] = val;
+                  });
+                }
+                return {
+                  ...c,
+                  id: getSeedId(c.id),
+                  productBalances: mappedBalances
+                };
+              }),
+              suppliers: INITIAL_SUPPLIERS.map(s => ({ ...s, id: getSeedId(s.id) })),
+              employees: INITIAL_EMPLOYEES.map(e => ({ ...e, id: getSeedId(e.id) })),
+              vehicles: INITIAL_VEHICLES.map(v => ({ ...v, id: getSeedId(v.id) })),
+              transports: INITIAL_TRANSPORTS.map(t => ({ ...t, id: getSeedId(t.id) })),
+              activeTransports: [],
+              deliveryRoutes: INITIAL_DELIVERY_ROUTES.map(r => ({ ...r, id: getSeedId(r.id) })),
+              countingRoutes: INITIAL_COUNTING_ROUTES.map(r => ({ ...r, id: getSeedId(r.id) })),
+              movementsHistory: [],
+              sobraClientes: [],
+              countDocuments: [],
+            }
+          };
+        });
       }
     } catch (e: any) {
+      const msg = e?.message || String(e);
       console.warn('[Supabase] Falha na sincronização dos dados:', e);
       if (!silent) {
-        setDbStatus('error');
-        setDbErrorMessage(e?.message || String(e));
+        if (msg.includes('Failed to fetch') || msg.includes('fetch') || msg.includes('network') || msg.includes('NetworkError')) {
+          setDbStatus('disconnected');
+          setDbErrorMessage(undefined);
+        } else {
+          setDbStatus('error');
+          setDbErrorMessage(msg);
+        }
       }
     }
   };
@@ -1333,42 +1442,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const getActiveState = (): AppState => {
-    const state = distributorStates[activeDistributor];
-    if (state) return state;
-
-    // Default structure for non-existent distributor states
-    const emptyState: AppState = {
-      products: [],
-      clients: [],
-      suppliers: [],
-      employees: [],
-      vehicles: [],
-      transports: [],
-      activeTransports: [],
-      deliveryRoutes: [],
-      countingRoutes: [],
-      movementsHistory: [],
-      sobraClientes: [],
-      countDocuments: [],
+    const state = distributorStates[activeDistributor] || {};
+    return {
+      products: state.products || [],
+      clients: state.clients || [],
+      suppliers: state.suppliers || [],
+      employees: state.employees || [],
+      vehicles: state.vehicles || [],
+      transports: state.transports || [],
+      activeTransports: state.activeTransports || [],
+      deliveryRoutes: state.deliveryRoutes || [],
+      countingRoutes: state.countingRoutes || [],
+      movementsHistory: state.movementsHistory || [],
+      sobraClientes: state.sobraClientes || [],
+      countDocuments: state.countDocuments || [],
     };
-    return emptyState;
   };
 
   const updateActiveStateBySetter = (updater: (prev: AppState) => AppState) => {
     setDistributorStates(prev => {
-      const current = prev[activeDistributor] || {
-        products: [],
-        clients: [],
-        suppliers: [],
-        employees: [],
-        vehicles: [],
-        transports: [],
-        activeTransports: [],
-        deliveryRoutes: [],
-        countingRoutes: [],
-        movementsHistory: [],
-        sobraClientes: [],
-        countDocuments: [],
+      const currentRaw = prev[activeDistributor] || {};
+      const current: AppState = {
+        products: currentRaw.products || [],
+        clients: currentRaw.clients || [],
+        suppliers: currentRaw.suppliers || [],
+        employees: currentRaw.employees || [],
+        vehicles: currentRaw.vehicles || [],
+        transports: currentRaw.transports || [],
+        activeTransports: currentRaw.activeTransports || [],
+        deliveryRoutes: currentRaw.deliveryRoutes || [],
+        countingRoutes: currentRaw.countingRoutes || [],
+        movementsHistory: currentRaw.movementsHistory || [],
+        sobraClientes: currentRaw.sobraClientes || [],
+        countDocuments: currentRaw.countDocuments || [],
       };
       return {
         ...prev,
@@ -2075,9 +2181,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (supabase) {
-        supabase.from('transports').delete().eq('distributor', activeDistributor).then();
-        supabase.from('transports_liquidated').delete().eq('distributor', activeDistributor).then();
-        supabase.from('sobra_cliente_logs').delete().eq('distributor', activeDistributor).then();
+        const runDelete = async (table: string) => {
+          try {
+            await supabase!.from(table).delete().eq('distributor', activeDistributor);
+          } catch (err) {
+            console.warn(`[Supabase] Failed to clear ${table}:`, err);
+          }
+        };
+        runDelete('transports');
+        runDelete('transports_liquidated');
+        runDelete('sobra_cliente_logs');
       }
 
       return {
