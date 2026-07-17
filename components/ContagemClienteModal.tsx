@@ -148,7 +148,7 @@ export default function ContagemClienteModal() {
   const handleSaveClientCounts = () => {
     if (!activeDoc || !currentClient) return;
 
-    if (!contagemTiming) {
+    if (!clientClosed && !contagemTiming) {
       setSaveError("Por favor, preencha o campo obrigatório: 'Quando foi feita a contagem'");
       setTimeout(() => {
         setSaveError(null);
@@ -162,7 +162,7 @@ export default function ContagemClienteModal() {
     const updatedContagemTiming = { ...(activeDoc.clientContagemTiming || {}) };
 
     updatedClosedFlags[currentClient.id] = clientClosed;
-    updatedContagemTiming[currentClient.id] = contagemTiming;
+    updatedContagemTiming[currentClient.id] = clientClosed ? 'N/A' : contagemTiming;
     
     if (clientClosed) {
       updatedStatuses[currentClient.id] = 'FECHADO';
@@ -577,6 +577,7 @@ export default function ContagemClienteModal() {
             }
           });
           const adherencePercent = totalClientsCount > 0 ? (countedClientsCount / totalClientsCount) * 100 : 0;
+          const hasUncounted = Object.values(activeDoc.clientStatuses).some((status) => status === 'NÃO CONTADO');
 
           return (
             <div className="flex flex-col h-full">
@@ -692,8 +693,13 @@ export default function ContagemClienteModal() {
               <div className="bg-gray-100 border-t border-gray-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
                 <button
                   type="button"
+                  disabled={hasUncounted}
                   onClick={handleOpenSummary}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs"
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-xs ${
+                    hasUncounted
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                  }`}
                 >
                   Finalizar Contagem
                 </button>
@@ -907,16 +913,19 @@ export default function ContagemClienteModal() {
                   </div>
 
                   {/* Quando foi feita a contagem - Campo Obrigatório */}
-                  <div className="bg-slate-100 border-2 border-slate-200 rounded-xl p-4 space-y-2.5 shadow-3xs">
+                  <div className={`bg-slate-100 border-2 border-slate-200 rounded-xl p-4 space-y-2.5 shadow-3xs transition-all ${
+                    clientClosed ? 'opacity-40 pointer-events-none' : ''
+                  }`}>
                     <label className="text-xs font-black uppercase block tracking-wider text-slate-800">
-                      Quando foi feita a contagem? <span className="text-red-500 font-black">*</span>
+                      Quando foi feita a contagem? {!clientClosed && <span className="text-red-500 font-black">*</span>}
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
+                        disabled={clientClosed}
                         onClick={() => setContagemTiming('Antes da Entrega')}
                         className={`py-2 px-3 text-xs font-black rounded-lg border-2 transition-all cursor-pointer ${
-                          contagemTiming === 'Antes da Entrega'
+                          contagemTiming === 'Antes da Entrega' && !clientClosed
                             ? 'bg-green-600 border-green-700 text-white shadow-xs font-black'
                             : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                         }`}
@@ -925,9 +934,10 @@ export default function ContagemClienteModal() {
                       </button>
                       <button
                         type="button"
+                        disabled={clientClosed}
                         onClick={() => setContagemTiming('Depois da Entrega')}
                         className={`py-2 px-3 text-xs font-black rounded-lg border-2 transition-all cursor-pointer ${
-                          contagemTiming === 'Depois da Entrega'
+                          contagemTiming === 'Depois da Entrega' && !clientClosed
                             ? 'bg-green-600 border-green-700 text-white shadow-xs font-black'
                             : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                         }`}

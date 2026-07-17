@@ -31,7 +31,7 @@ export default function DashboardView() {
   const [regNome, setRegNome] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
-  const [regCargo, setRegCargo] = useState('Gestor de Estoque');
+  const [regCargo, setRegCargo] = useState('');
   const [regPerfil, setRegPerfil] = useState('');
   const [regEnableTelegram, setRegEnableTelegram] = useState(false);
   const [regTelegramChatId, setRegTelegramChatId] = useState('');
@@ -120,7 +120,7 @@ export default function DashboardView() {
       setRegNome('');
       setRegEmail('');
       setRegPassword('');
-      setRegCargo('Gestor de Estoque');
+      setRegCargo('');
       setRegPerfil('');
       setRegEnableTelegram(false);
       setRegTelegramChatId('');

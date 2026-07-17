@@ -156,6 +156,14 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     enableTelegram: true
   },
   {
+    id: 'e_master_3',
+    empresa: 'MOVIX CENTRAL',
+    nome: 'Lucas Amaral',
+    cargo: 'TI Admin',
+    email: 'lucas.amaral@movix.com',
+    perfilTipo: 'TI Admin'
+  },
+  {
     id: 'e1',
     empresa: 'Distribuidor A',
     nome: 'Carlos Eduardo Oliveira',

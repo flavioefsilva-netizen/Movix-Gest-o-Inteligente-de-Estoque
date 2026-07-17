@@ -243,10 +243,10 @@ export default function ConferenciaModal() {
       }
     });
 
-    // Consolidate total pickup and sobra to return to physical stock in warehouse
+    // Consolidate total pickup to return to physical stock in warehouse (sobras are excluded from warehouse stock)
     const productPickupSums: { [productId: string]: number } = {};
     products.forEach(p => {
-      const totalToReturn = (coletaProductSums[p.id] || 0) + (sobraProductSums[p.id] || 0);
+      const totalToReturn = (coletaProductSums[p.id] || 0);
       if (totalToReturn > 0) {
         productPickupSums[p.id] = totalToReturn;
       }
@@ -811,14 +811,14 @@ export default function ConferenciaModal() {
             <div className="bg-green-100/50 px-4 py-2.5 border-b border-green-200">
               <h4 className="text-xs font-black text-green-800 uppercase tracking-wider">Resumo de Carga por Material</h4>
             </div>
-            <div className="overflow-x-auto flex-1">
+            <div className="overflow-x-auto flex-1 max-h-[220px] overflow-y-auto scrollbar-thin">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-green-200 bg-green-100/30 text-green-700 font-extrabold uppercase text-[10px] tracking-wider">
                     <th className="py-2.5 px-4">Material</th>
                     <th className="py-2.5 px-4 text-center">Não Entregue</th>
                     <th className="py-2.5 px-4 text-center">Coletado</th>
-                    <th className="py-2.5 px-4 text-center bg-green-300 text-green-950 font-black">QTDE TOTAL</th>
+                    <th className="py-2.5 px-4 text-center bg-green-600 text-white font-black">QTDE TOTAL</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-green-100">
@@ -830,11 +830,11 @@ export default function ConferenciaModal() {
                     return (
                       <tr key={p.id} className="hover:bg-green-100/20 transition-colors font-medium text-[12px]">
                         <td className="py-2.5 px-4 text-[12px]">
-                          <div className="text-slate-800 font-semibold">{p.description}</div>
+                           <div className="text-slate-800 font-semibold">{p.description}</div>
                         </td>
                         <td className="py-2.5 px-4 text-center font-mono text-slate-700 text-[12px]">{saida}</td>
                         <td className="py-2.5 px-4 text-center font-mono text-slate-700 text-[12px]">{coleta}</td>
-                        <td className="py-2.5 px-4 text-center font-mono font-black text-green-950 text-[14px] bg-green-300">{totalRow}</td>
+                        <td className="py-2.5 px-4 text-center font-mono font-black text-white text-[14px] bg-green-600">{totalRow}</td>
                       </tr>
                     );
                   })}
@@ -863,7 +863,7 @@ export default function ConferenciaModal() {
                         <td className="py-2.5 px-4 font-black uppercase text-green-800 text-[10px] tracking-wider">Soma Total</td>
                         <td className="py-2.5 px-4 text-center font-mono">{totalSaida}</td>
                         <td className="py-2.5 px-4 text-center font-mono">{totalColeta}</td>
-                        <td className="py-2.5 px-4 text-center font-mono font-black text-green-950 text-[14px] bg-green-300">{totalQtdeTotal}</td>
+                        <td className="py-2.5 px-4 text-center font-mono font-black text-white text-[14px] bg-green-600">{totalQtdeTotal}</td>
                       </tr>
                     );
                   })()}

@@ -232,6 +232,10 @@ export default function LogisticDashboardView() {
   // Animation state for vehicle icons
   const [animateProgress, setAnimateProgress] = useState(false);
 
+  // Filters for Veículos em Entregas
+  const [filterDeliveryDate, setFilterDeliveryDate] = useState<string>(''); // YYYY-MM-DD
+  const [filterProgressTypes, setFilterProgressTypes] = useState<string[]>(['Sem saída', 'Em entrega', 'Finalizado']);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setAnimateProgress(true);
@@ -477,7 +481,17 @@ export default function LogisticDashboardView() {
       const tipo = t.tipoTransporte || '';
       return tipo === 'Aberto' || tipo === 'Fechado' || tipo === 'ABERTO' || tipo === 'FECHADO';
     });
-    return active.map((t) => {
+
+    let filteredActive = active;
+    if (filterDeliveryDate) {
+      const parts = filterDeliveryDate.split('-');
+      if (parts.length === 3) {
+        const formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+        filteredActive = filteredActive.filter((t) => t.date === formattedDate);
+      }
+    }
+
+    const results = filteredActive.map((t) => {
       const totalClients = t.selectedClientIds?.length || t.clienteTotal || 0;
       // Get the clients of this transport and look up their statusEntrega
       const transportClients = clients.filter((c) => t.selectedClientIds?.includes(c.id));
@@ -500,10 +514,20 @@ export default function LogisticDashboardView() {
         placa: t.placa,
         totalClients,
         completedClients,
-        progress
+        progress,
+        date: t.date
       };
     });
-  }, [activeTransports, clients]);
+
+    return results.filter((rt) => {
+      const category = rt.progress === 0 
+        ? 'Sem saída' 
+        : rt.progress === 100 
+          ? 'Finalizado' 
+          : 'Em entrega';
+      return filterProgressTypes.includes(category);
+    }).sort((a, b) => a.progress - b.progress);
+  }, [activeTransports, clients, filterDeliveryDate, filterProgressTypes]);
 
   // --- 6. CALCULATIONS FOR ENTREGAS REALIZADAS PIE CHART ---
   const deliveriesPieData = useMemo(() => {
@@ -791,11 +815,11 @@ export default function LogisticDashboardView() {
           </div>
         </div>
 
-        {/* Right Column: Veículos em Entregas (Hoje) + Entregas Realizadas (Hoje) */}
+        {/* Right Column: Veículos em Entregas + Entregas Realizadas (Hoje) */}
         <div className="flex flex-col gap-5">
-          {/* Quadrante: Veículos em Entregas (Hoje) */}
+          {/* Quadrante: Veículos em Entregas */}
           <div id="quadrante_caminhoes_entrega" className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between min-h-[500px]">
-            <div className="border-b border-gray-100 pb-3 mb-4 text-left flex items-center justify-between">
+            <div className="border-b border-gray-100 pb-3 mb-4 text-left flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
@@ -807,9 +831,87 @@ export default function LogisticDashboardView() {
                 </button>
                 <div>
                   <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider">
-                    Veículos em Entregas (Hoje)
+                    Veículos em Entregas
                   </h3>
                   <p className="text-[10px] text-gray-400 mt-0.5">Acompanhamento e progresso em rota real</p>
+                </div>
+              </div>
+
+              {/* Filters for Delivery Date and Status */}
+              <div className="flex items-center gap-2 flex-wrap text-black">
+                {/* Date Picker Filter */}
+                <div className="flex items-center gap-1 bg-gray-50 border border-gray-300 rounded-lg px-2 py-1">
+                  <span className="material-symbols-outlined text-xs text-gray-400">calendar_today</span>
+                  <input
+                    type="date"
+                    id="delivery-date-filter"
+                    value={filterDeliveryDate}
+                    onChange={(e) => setFilterDeliveryDate(e.target.value)}
+                    className="bg-transparent text-[10px] font-bold text-slate-800 outline-none w-24 cursor-pointer"
+                  />
+                  {filterDeliveryDate && (
+                    <button
+                      type="button"
+                      onClick={() => setFilterDeliveryDate('')}
+                      className="hover:text-red-500 text-gray-400 transition-colors flex items-center"
+                      title="Remover filtro de data"
+                    >
+                      <span className="material-symbols-outlined text-xs">close</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Status Multi-Select Checkboxes */}
+                <div className="flex items-center gap-2.5 bg-gray-50 border border-gray-300 rounded-lg px-2.5 py-1 text-[10px] font-bold text-slate-800">
+                  <span className="text-gray-400 font-extrabold uppercase text-[9px] mr-0.5">Filtro:</span>
+                  
+                  <label className="flex items-center gap-1 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={filterProgressTypes.includes('Sem saída')}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFilterProgressTypes([...filterProgressTypes, 'Sem saída']);
+                        } else {
+                          setFilterProgressTypes(filterProgressTypes.filter(x => x !== 'Sem saída'));
+                        }
+                      }}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-3 w-3 cursor-pointer"
+                    />
+                    <span>Sem saída</span>
+                  </label>
+
+                  <label className="flex items-center gap-1 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={filterProgressTypes.includes('Em entrega')}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFilterProgressTypes([...filterProgressTypes, 'Em entrega']);
+                        } else {
+                          setFilterProgressTypes(filterProgressTypes.filter(x => x !== 'Em entrega'));
+                        }
+                      }}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-3 w-3 cursor-pointer"
+                    />
+                    <span>Em entrega</span>
+                  </label>
+
+                  <label className="flex items-center gap-1 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={filterProgressTypes.includes('Finalizado')}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFilterProgressTypes([...filterProgressTypes, 'Finalizado']);
+                        } else {
+                          setFilterProgressTypes(filterProgressTypes.filter(x => x !== 'Finalizado'));
+                        }
+                      }}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-3 w-3 cursor-pointer"
+                    />
+                    <span>Finalizado</span>
+                  </label>
                 </div>
               </div>
             </div>

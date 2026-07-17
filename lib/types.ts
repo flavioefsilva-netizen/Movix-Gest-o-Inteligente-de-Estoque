@@ -32,6 +32,7 @@ export interface Client {
   statusEntrega?: string;
   statusDuranteContagem?: string;
   statusFinalContagem?: string;
+  motivoNaoEntrega?: string;
   pickupQuantities?: { [productId: string]: number };
   deliveryQuantities?: { [productId: string]: number };
   contagemEstoque?: {
@@ -130,7 +131,7 @@ export interface Transport {
   selectedRouteIds: string[];
   selectedClientIds: string[];
   tipoTransporte: 'ABERTO' | 'FECHADO' | 'Aberto' | 'Fechado' | 'Finalizado';
-  statusTransporte: 'CRIADO' | 'EM_ENTREGA' | 'LIQUIDADO' | 'EM_LIQUIDACAO' | 'EXCLUIDO' | 'Finalizado';
+  statusTransporte: 'CRIADO' | 'EM_ENTREGA' | 'LIQUIDADO' | 'EM_LIQUIDACAO' | 'EXCLUIDO' | 'Finalizado' | 'SAIDA' | 'SAÍDA';
   
   // Contadores
   clienteTotal: number;

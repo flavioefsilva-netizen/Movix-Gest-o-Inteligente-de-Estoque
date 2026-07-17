@@ -2317,7 +2317,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         getDistributorStats,
         
         // Active lists
-        products: activeState.products,
+        products: [...activeState.products].sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' })),
         clients: activeState.clients,
         suppliers: activeState.suppliers,
         employees: activeState.employees,

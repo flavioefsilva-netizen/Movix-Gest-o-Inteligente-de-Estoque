@@ -66,6 +66,11 @@ export default function CreateTransportModal() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showCreateAnotherConfirm, setShowCreateAnotherConfirm] = useState(false);
 
+  // Custom states for date and client searching
+  const [deliveryDate, setDeliveryDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [clientSearchField, setClientSearchField] = useState<'matricula' | 'razaoSocial' | 'cnpj' | 'rotaEntrega'>('matricula');
+  const [clientSearchQuery, setClientSearchQuery] = useState('');
+
   const resetForm = () => {
     setPlacaInput('');
     setSelectedVehicle(null);
@@ -85,6 +90,9 @@ export default function CreateTransportModal() {
     setShowRoutesReport(false);
     setSuccessMessage(null);
     setShowCreateAnotherConfirm(false);
+    setDeliveryDate(new Date().toISOString().split('T')[0]);
+    setClientSearchField('matricula');
+    setClientSearchQuery('');
   };
 
   // Close suggestions when clicking outside
@@ -132,7 +140,7 @@ export default function CreateTransportModal() {
 
   // Toggle states
   const [transportMode, setTransportMode] = useState<'rota' | 'multirota' | 'forarota'>('rota');
-  const [showZeroQtyConfirmDialog, setShowZeroQtyConfirmDialog] = useState(false);
+
   const [showExcluirTransportesModal, setShowExcluirTransportesModal] = useState(false);
   const [selectedTransportIdsForDeletion, setSelectedTransportIdsForDeletion] = useState<string[]>([]);
   const [showDeletionConfirmDialog, setShowDeletionConfirmDialog] = useState(false);
@@ -206,7 +214,7 @@ export default function CreateTransportModal() {
   };
 
   // Filter clients based on selected mode
-  const activeClients = clients.filter(c => {
+  const baseActiveClients = clients.filter(c => {
     // Check if client belongs to a route that has status ROTEIRIZADA
     const clientRoute = deliveryRoutes.find(r => String(r.numeroRota) === String(c.rotaEntrega));
     if (clientRoute && clientRoute.statusRotaEntrega?.toUpperCase() === 'ROTEIRIZADA') {
@@ -228,6 +236,24 @@ export default function CreateTransportModal() {
       return String(selectedRoute.numeroRota) === String(c.rotaEntrega);
     }
     return false;
+  });
+
+  const activeClients = baseActiveClients.filter(c => {
+    if (!clientSearchQuery) return true;
+    const query = clientSearchQuery.toLowerCase();
+    if (clientSearchField === 'matricula') {
+      return (c.matricula || '').toLowerCase().includes(query);
+    }
+    if (clientSearchField === 'razaoSocial') {
+      return (c.razaoSocial || '').toLowerCase().includes(query);
+    }
+    if (clientSearchField === 'cnpj') {
+      return (c.cnpj || '').toLowerCase().includes(query);
+    }
+    if (clientSearchField === 'rotaEntrega') {
+      return (c.rotaEntrega || '').toLowerCase().includes(query);
+    }
+    return true;
   });
 
   // Totals of clients selected
@@ -352,14 +378,7 @@ export default function CreateTransportModal() {
 
     if (!valid) return;
 
-    // Validate if any product quantities are filled in the "Produtos que Compõe esse Transporte" section
-    const totalQty = products.reduce((sum, p) => sum + (parseInt(productQuantities[p.id] || '0', 10) || 0), 0);
-    if (!bypassQtyCheck && totalQty === 0) {
-      setShowZeroQtyConfirmDialog(true);
-      return;
-    }
-
-    // Build the stock object for each product
+    // Build the stock object for each product (initialized to 0 on transport creation)
     const transportStock: {
       [productId: string]: {
         veiculo: number;
@@ -371,13 +390,12 @@ export default function CreateTransportModal() {
     } = {};
 
     products.forEach(p => {
-      const qtyOut = parseInt(productQuantities[p.id] || '0', 10) || 0;
       transportStock[p.id] = {
-        veiculo: qtyOut,
-        entrega: qtyOut,
+        veiculo: 0,
+        entrega: 0,
         coleta: 0,
         cliente: 0,
-        saidaEntrega: qtyOut
+        saidaEntrega: 0
       };
     });
 
@@ -403,7 +421,7 @@ export default function CreateTransportModal() {
     const newTransport: Transport = {
       id: generateUniqueId(),
       number: transportNumber,
-      date: getFormattedCurrentDate(),
+      date: deliveryDate.split('-').reverse().join('/'),
       placa: selectedVehicle ? selectedVehicle.placa : placaInput.toUpperCase(),
       driver: selectedDriver ? selectedDriver.nome : driverInput,
       route: routeDesc,
@@ -555,7 +573,7 @@ export default function CreateTransportModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200 overflow-y-auto">
-      <div className="bg-white w-full max-w-5xl rounded-2xl overflow-hidden border border-blue-200 shadow-2xl flex flex-col h-[92vh] my-4">
+      <div className="bg-white w-full max-w-6xl xl:max-w-[1180px] rounded-2xl overflow-hidden border border-blue-200 shadow-2xl flex flex-col h-[92vh] my-4">
         
         {/* Header Bar */}
         <div className="bg-blue-600 px-6 py-4 flex items-center justify-between text-white flex-shrink-0">
@@ -637,45 +655,129 @@ export default function CreateTransportModal() {
           {/* Main 2-Row/Columns Layout */}
           <div className="space-y-6">
             
-            {/* Top Row: Dados da Carga and Produtos */}
+            {/* Top Row: Dados da Carga */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               
-              {/* Column 1: Dados da Carga (lg:col-span-8) */}
-              <div className="lg:col-span-8 space-y-4">
-                {/* Stacked Inputs Container - Centered */}
-                <div className="max-w-xl mx-auto w-full bg-slate-50 border border-blue-500 rounded-xl p-4 shadow-3xs space-y-3 text-black text-[12px] font-bold">
-                  <div className="border-b border-blue-200 pb-2 mb-2 flex items-center text-blue-600">
+              {/* Column 1: Dados da Carga (lg:col-span-12) */}
+              <div className="lg:col-span-12 space-y-4">
+                <div className="w-full bg-slate-50 border border-blue-500 rounded-xl p-4 shadow-3xs text-black text-[12px] font-bold">
+                  <div className="border-b border-blue-200 pb-2 mb-4 flex flex-wrap items-center justify-between text-blue-600 gap-4">
                     <div className="flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-base text-blue-600">local_shipping</span>
                       <span className="text-[12px] font-black uppercase tracking-wider text-black">Dados da Carga</span>
                     </div>
+
+                    {/* All required action buttons aligned in the header row */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          setSelectedTransportIdsForDeletion([]);
+                          setShowExcluirTransportesModal(true);
+                        }}
+                        className="h-8 px-2.5 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg text-[10px] font-black text-red-700 uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap"
+                      >
+                        <span className="material-symbols-outlined text-sm">delete</span>
+                        Excluir Transportes
+                      </button>
+
+                      <button 
+                        type="button" 
+                        onClick={() => setShowRoutesReport(!showRoutesReport)}
+                        className="h-8 px-2.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg text-[10px] font-black text-blue-700 uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap"
+                      >
+                        <span className="material-symbols-outlined text-sm">assignment</span>
+                        Rotas e Clientes
+                      </button>
+
+                      <button 
+                        type="button" 
+                        onClick={handleReabilitarRotas}
+                        className="h-8 px-2.5 bg-gray-150 hover:bg-gray-200 border border-gray-300 rounded-lg text-[10px] font-black text-gray-750 uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap"
+                      >
+                        <span className="material-symbols-outlined text-sm">restart_alt</span>
+                        Reativar Rotas
+                      </button>
+
+                      <div className="flex p-0.5 bg-gray-205 border border-gray-300 rounded-xl w-48 h-8 items-center">
+                        <button
+                          type="button"
+                          onClick={() => handleModeChange('rota')}
+                          className={`flex-1 h-6 rounded-lg text-[9px] font-black uppercase transition-all cursor-pointer ${
+                            transportMode === 'rota'
+                              ? 'bg-blue-600 text-white shadow-xs'
+                              : 'text-gray-500 hover:text-gray-850'
+                          }`}
+                        >
+                          Rota
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleModeChange('multirota')}
+                          className={`flex-1 h-6 rounded-lg text-[9px] font-black uppercase transition-all cursor-pointer ${
+                            transportMode === 'multirota'
+                              ? 'bg-blue-600 text-white shadow-xs'
+                              : 'text-gray-500 hover:text-gray-850'
+                          }`}
+                          title="Mini Rota"
+                        >
+                          Mini Rota
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleModeChange('forarota')}
+                          className={`flex-1 h-6 rounded-lg text-[9px] font-black uppercase transition-all cursor-pointer ${
+                            transportMode === 'forarota'
+                              ? 'bg-blue-600 text-white shadow-xs'
+                              : 'text-gray-500 hover:text-gray-850'
+                          }`}
+                        >
+                          Fora Rota
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Nº Transporte */}
-                  <div className="flex items-center justify-between gap-2 border-b border-gray-100 pb-1.5">
-                    <div className="w-1/3 flex justify-start">
-                      <label className="text-[12px] font-bold text-black uppercase tracking-widest whitespace-nowrap">Nº Transporte</label>
+                  {/* 5-Column Inline Layout */}
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-6 items-start relative">
+                    
+                    {/* Column 1: Nº do Transporte */}
+                    <div className="flex flex-col justify-between h-full space-y-2">
+                      <div>
+                        <label className="text-[11px] font-black text-slate-700 uppercase tracking-wider block mb-1">
+                          Nº do Transporte
+                        </label>
+                        <input
+                          type="text"
+                          value={transportNumber}
+                          disabled
+                          readOnly
+                          className="w-full h-9 px-2 text-slate-500 font-bold text-center text-xs rounded-lg border border-gray-250 bg-gray-100 cursor-not-allowed"
+                        />
+                      </div>
                     </div>
-                    <div className="w-1/3 flex justify-center">
-                      <input
-                        type="text"
-                        value={transportNumber}
-                        readOnly
-                        className="w-[123px] h-8 bg-blue-600 text-white font-black text-center text-xs rounded-lg border border-blue-700 shadow-3xs outline-hidden cursor-not-allowed"
-                      />
-                    </div>
-                    <div className="w-1/3 flex justify-end"></div>
-                  </div>
 
-                  {/* Placa do Veículo Suggest Input */}
-                  <div className="flex items-center justify-between gap-2 border-b border-gray-100 pb-1.5 relative" ref={vehicleRef}>
-                    <div className="w-1/3 flex justify-start">
-                      <label className="text-[12px] font-bold text-black uppercase tracking-widest whitespace-nowrap">
-                        Placa do Veículo <span className="text-red-500">*</span>
-                      </label>
+                    {/* Column 2: Data de Entrega */}
+                    <div className="flex flex-col justify-between h-full space-y-2">
+                      <div>
+                        <label className="text-[11px] font-black text-slate-700 uppercase tracking-wider block mb-1">
+                          Data de Entrega
+                        </label>
+                        <input
+                          type="date"
+                          value={deliveryDate}
+                          onChange={(e) => setDeliveryDate(e.target.value)}
+                          className="w-full h-9 px-2 text-slate-800 font-bold text-center text-xs rounded-lg border border-gray-250 shadow-3xs outline-hidden focus:ring-2 focus:ring-blue-500 bg-white"
+                        />
+                      </div>
                     </div>
-                    <div className="w-1/3 flex justify-center">
-                      <div className="relative w-[123px] flex flex-col items-center">
+
+                    {/* Column 3: Placa do Veículo */}
+                    <div className="flex flex-col justify-between h-full space-y-2 relative" ref={vehicleRef}>
+                      <div>
+                        <label className="text-[11px] font-black text-slate-700 uppercase tracking-wider block mb-1">
+                          Placa do Veículo <span className="text-red-500">*</span>
+                        </label>
                         <div className="relative w-full">
                           <input
                             type="text"
@@ -686,7 +788,7 @@ export default function CreateTransportModal() {
                               setPlacaError('');
                             }}
                             onFocus={() => setShowVehicleSuggest(true)}
-                            className={`w-full h-8 px-2 pr-7 bg-white rounded-lg border text-xs font-bold uppercase transition-all outline-hidden focus:ring-2 focus:ring-blue-500 ${
+                            className={`w-full h-9 px-2 pr-7 bg-white rounded-lg border text-xs font-bold uppercase transition-all outline-hidden focus:ring-2 focus:ring-blue-500 ${
                               placaError ? 'border-red-500 ring-1 ring-red-100' : 'border-gray-250 shadow-3xs'
                             }`}
                           />
@@ -695,63 +797,49 @@ export default function CreateTransportModal() {
                           </span>
                         </div>
                         {selectedVehicle ? (
-                          <span className="text-[8px] font-bold text-blue-600 mt-0.5 truncate max-w-full block text-center">
+                          <span className="text-[9px] font-bold text-blue-600 mt-0.5 truncate max-w-full block">
                             🚗 {selectedVehicle.transportadora}
                           </span>
                         ) : (
-                          <span className="text-[8px] text-gray-400 mt-0.5 block text-center">
-                            Sem veículo selecionado
+                          <span className="text-[9px] text-gray-400 mt-0.5 block">
+                            Sem veículo
                           </span>
                         )}
-                        {placaError && <span className="text-[8px] font-bold text-red-500 mt-0.5 block text-center">{placaError}</span>}
+                        {placaError && <span className="text-[9px] font-bold text-red-500 mt-0.5 block">{placaError}</span>}
                       </div>
-                    </div>
-                    <div className="w-1/3 flex justify-end">
-                      <button 
-                        type="button" 
-                        onClick={() => setShowRoutesReport(!showRoutesReport)}
-                        className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg text-[10px] font-black text-blue-700 uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap"
-                      >
-                        <span className="material-symbols-outlined text-sm">assignment</span>
-                        Rotas e Clientes
-                      </button>
-                    </div>
-                    
-                    {/* Suggester Box */}
-                    {showVehicleSuggest && (
-                      <div className="absolute top-[36px] left-1/2 -translate-x-1/2 w-64 z-30 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
-                        {filteredVehicles.map(v => (
-                          <button
-                            key={v.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedVehicle(v);
-                              setPlacaInput(v.placa);
-                              setPlacaError('');
-                              setShowVehicleSuggest(false);
-                            }}
-                            className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors text-xs font-bold text-slate-800 flex justify-between border-b border-gray-50 last:border-0"
-                          >
-                            <span className="text-blue-600 font-extrabold">{v.placa}</span>
-                            <span className="text-gray-400 text-[9px] font-medium">{v.transportadora}</span>
-                          </button>
-                        ))}
-                        {filteredVehicles.length === 0 && (
-                          <p className="p-2 text-center text-[11px] text-gray-400 italic">Nenhum veículo encontrado</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Motorista Input */}
-                  <div className="flex items-center justify-between gap-2 border-b border-gray-100 pb-1.5 relative" ref={driverRef}>
-                    <div className="w-1/3 flex justify-start">
-                      <label className="text-[12px] font-bold text-black uppercase tracking-widest whitespace-nowrap">
-                        Motorista <span className="text-red-500">*</span>
-                      </label>
+                      {/* Suggester Box for Vehicle */}
+                      {showVehicleSuggest && (
+                        <div className="absolute top-[58px] left-0 w-full z-30 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto min-w-[200px]">
+                          {filteredVehicles.map(v => (
+                            <button
+                              key={v.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedVehicle(v);
+                                setPlacaInput(v.placa);
+                                setPlacaError('');
+                                setShowVehicleSuggest(false);
+                              }}
+                              className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors text-xs font-bold text-slate-800 flex justify-between border-b border-gray-50 last:border-0"
+                            >
+                              <span className="text-blue-600 font-extrabold">{v.placa}</span>
+                              <span className="text-gray-400 text-[9px] font-medium">{v.transportadora}</span>
+                            </button>
+                          ))}
+                          {filteredVehicles.length === 0 && (
+                            <p className="p-2 text-center text-[11px] text-gray-400 italic">Nenhum veículo encontrado</p>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <div className="w-1/3 flex justify-center">
-                      <div className="relative w-[123px] flex flex-col items-center">
+
+                    {/* Column 4: Motorista */}
+                    <div className="flex flex-col justify-between h-full space-y-2 relative" ref={driverRef}>
+                      <div>
+                        <label className="text-[11px] font-black text-slate-700 uppercase tracking-wider block mb-1">
+                          Motorista <span className="text-red-500">*</span>
+                        </label>
                         <div className="relative w-full">
                           <input
                             type="text"
@@ -762,7 +850,7 @@ export default function CreateTransportModal() {
                               setDriverError('');
                             }}
                             onFocus={() => setShowDriverSuggest(true)}
-                            className={`w-full h-8 px-2 pr-7 bg-white rounded-lg border text-xs font-semibold transition-all outline-hidden focus:ring-2 focus:ring-blue-500 ${
+                            className={`w-full h-9 px-2 pr-7 bg-white rounded-lg border text-xs font-semibold transition-all outline-hidden focus:ring-2 focus:ring-blue-500 ${
                               driverError ? 'border-red-500 ring-1 ring-red-100' : 'border-gray-250 shadow-3xs'
                             }`}
                           />
@@ -771,64 +859,49 @@ export default function CreateTransportModal() {
                           </span>
                         </div>
                         {selectedDriver ? (
-                          <span className="text-[8px] font-bold text-blue-600 mt-0.5 block text-center">
+                          <span className="text-[9px] font-bold text-blue-600 mt-0.5 block">
                             ✓ Motorista Homologado
                           </span>
                         ) : (
-                          <span className="text-[8px] text-gray-450 mt-0.5 block text-center">
-                            Sem motorista selecionado
+                          <span className="text-[9px] text-gray-450 mt-0.5 block">
+                            Sem motorista
                           </span>
                         )}
-                        {driverError && <span className="text-[8px] font-bold text-red-500 mt-0.5 block text-center">{driverError}</span>}
+                        {driverError && <span className="text-[9px] font-bold text-red-500 mt-0.5 block">{driverError}</span>}
                       </div>
-                    </div>
-                    <div className="w-1/3 flex justify-end">
-                      <button 
-                        type="button" 
-                        onClick={handleReabilitarRotas}
-                        className="px-2.5 py-1.5 bg-gray-150 hover:bg-gray-200 border border-gray-300 rounded-lg text-[10px] font-black text-gray-750 uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap"
-                      >
-                        <span className="material-symbols-outlined text-sm">restart_alt</span>
-                        Reativar Rotas
-                      </button>
-                    </div>
-                    
-                    {/* Suggester Box */}
-                    {showDriverSuggest && (
-                      <div className="absolute top-[36px] left-1/2 -translate-x-1/2 w-64 z-30 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
-                        {filteredDrivers.map(d => (
-                          <button
-                            key={d.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedDriver(d);
-                              setDriverInput(d.nome);
-                              setDriverError('');
-                              setShowDriverSuggest(false);
-                            }}
-                            className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors text-xs font-bold text-slate-800 flex justify-between border-b border-gray-50 last:border-0"
-                          >
-                            <span>{d.nome}</span>
-                            <span className="text-blue-500 text-[8px] font-bold bg-blue-50 px-1.5 py-0.2 rounded-sm uppercase">{d.cargo}</span>
-                          </button>
-                        ))}
-                        {filteredDrivers.length === 0 && (
-                          <p className="p-2 text-center text-[11px] text-gray-400 italic">Nenhum motorista cadastrado</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Rota Entrega Input */}
-                  <div className="flex items-center justify-between gap-2 border-b border-gray-100 pb-1.5 relative" ref={routeRef}>
-                    <div className="w-1/3 flex justify-start">
-                      <label className="text-[12px] font-bold text-black uppercase tracking-widest whitespace-nowrap">
-                        Rota de Entrega <span className="text-red-500">*</span>
-                      </label>
+                      {/* Suggester Box for Driver */}
+                      {showDriverSuggest && (
+                        <div className="absolute top-[58px] left-0 w-full z-30 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto min-w-[200px]">
+                          {filteredDrivers.map(d => (
+                            <button
+                              key={d.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedDriver(d);
+                                setDriverInput(d.nome);
+                                setDriverError('');
+                                setShowDriverSuggest(false);
+                              }}
+                              className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors text-xs font-bold text-slate-800 flex justify-between border-b border-gray-50 last:border-0"
+                            >
+                              <span>{d.nome}</span>
+                              <span className="text-blue-500 text-[8px] font-bold bg-blue-50 px-1.5 py-0.2 rounded-sm uppercase">{d.cargo}</span>
+                            </button>
+                          ))}
+                          {filteredDrivers.length === 0 && (
+                            <p className="p-2 text-center text-[11px] text-gray-400 italic">Nenhum motorista cadastrado</p>
+                          )}
+                        </div>
+                      )}
                     </div>
 
-                    <div className="w-1/3 flex justify-center">
-                      <div className="relative w-[123px] flex flex-col items-center">
+                    {/* Column 5: Rota de Entrega */}
+                    <div className="flex flex-col justify-between h-full space-y-2 relative" ref={routeRef}>
+                      <div>
+                        <label className="text-[11px] font-black text-slate-700 uppercase tracking-wider block mb-1">
+                          Rota de Entrega <span className="text-red-500">*</span>
+                        </label>
                         <div className="relative w-full">
                           <input
                             type="text"
@@ -842,7 +915,7 @@ export default function CreateTransportModal() {
                             onFocus={() => {
                               if (transportMode === 'rota') setShowRouteSuggest(true);
                             }}
-                            className={`w-full h-8 px-2 pr-7 rounded-lg border text-xs font-bold transition-all outline-hidden focus:ring-2 focus:ring-blue-500 ${
+                            className={`w-full h-9 px-2 pr-7 rounded-lg border text-xs font-bold transition-all outline-hidden focus:ring-2 focus:ring-blue-500 ${
                               transportMode !== 'rota'
                                 ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed shadow-none'
                                 : routeError
@@ -854,7 +927,7 @@ export default function CreateTransportModal() {
                             map
                           </span>
                         </div>
-                        {routeError && <span className="text-[8px] font-bold text-red-500 mt-0.5 block text-center">{routeError}</span>}
+                        {routeError && <span className="text-[9px] font-bold text-red-500 mt-0.5 block">{routeError}</span>}
                         {transportMode === 'multirota' && (
                           <button
                             type="button"
@@ -863,173 +936,109 @@ export default function CreateTransportModal() {
                               setDraftMultiRouteIds([...selectedMultiRouteIds]);
                               setShowMultiRouteModal(true);
                             }}
-                            className="text-[8px] text-blue-600 font-extrabold hover:underline uppercase tracking-wider mt-0.5 block text-center cursor-pointer"
+                            className="text-[9px] text-blue-600 font-extrabold hover:underline uppercase tracking-wider mt-0.5 block text-left cursor-pointer"
                           >
                             {selectedMultiRouteIds.length === 0 
                               ? 'Selecionar Rotas' 
-                              : `${selectedMultiRouteIds.length} Rota(s) Selecionada(s) (Alterar)`}
+                              : `${selectedMultiRouteIds.length} Rota(s) (Alterar)`}
                           </button>
                         )}
                         {transportMode === 'forarota' && (
-                          <span className="text-[8px] text-gray-500 mt-0.5 block text-center uppercase font-bold">
+                          <span className="text-[9px] text-gray-500 mt-0.5 block uppercase font-bold">
                             Toda a Rede
                           </span>
                         )}
                       </div>
-                    </div>
 
-                    <div className="w-1/3 flex justify-end">
-                      {/* Switch / Chave Seletora Tripla (model of ESTOQUE EM ARMAZEM toggles) */}
-                      <div className="flex p-1 bg-gray-200 border border-gray-300 rounded-xl">
-                        <button
-                          type="button"
-                          onClick={() => handleModeChange('rota')}
-                          className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer ${
-                            transportMode === 'rota'
-                              ? 'bg-blue-600 text-white shadow-xs'
-                              : 'text-gray-500 hover:text-gray-850'
-                          }`}
-                        >
-                          Rota
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleModeChange('multirota')}
-                          className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer ${
-                            transportMode === 'multirota'
-                              ? 'bg-blue-600 text-white shadow-xs'
-                              : 'text-gray-500 hover:text-gray-850'
-                          }`}
-                        >
-                          Multi Rota
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleModeChange('forarota')}
-                          className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer ${
-                            transportMode === 'forarota'
-                              ? 'bg-blue-600 text-white shadow-xs'
-                              : 'text-gray-500 hover:text-gray-850'
-                          }`}
-                        >
-                          Fora Rota
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Suggester Box */}
-                    {transportMode === 'rota' && showRouteSuggest && (
-                      <div className="absolute top-[36px] left-1/2 -translate-x-1/2 w-64 z-30 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
-                        {filteredRoutes.map(r => (
-                          <button
-                            key={r.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedRoute(r);
-                              setRouteInput(`RT-${r.numeroRota} - ${r.cidade}`);
-                              setRouteError('');
-                              setShowRouteSuggest(false);
-                            }}
-                            className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors text-xs font-semibold text-slate-800 flex flex-col border-b border-gray-50 last:border-0"
-                          >
-                            <span className="text-blue-600 font-extrabold text-[11px]">RT-{r.numeroRota} - {r.cidade}</span>
-                            <span className="text-gray-400 text-[9px]">{r.bairroRegiao}</span>
-                          </button>
-                        ))}
-                        {filteredRoutes.length === 0 && (
-                          <p className="p-2 text-center text-[11px] text-gray-400 italic">Nenhuma rota de entrega encontrada</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Column 2: "Produtos que Compõe esse Transporte" (lg:col-span-4) */}
-              <div className="lg:col-span-4 bg-white border border-blue-500 rounded-xl shadow-xs overflow-hidden flex flex-col self-stretch text-black text-[12px] font-bold">
-                <div className="bg-gray-100 px-4 py-3 border-b border-blue-200 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-blue-600 text-sm">inventory_2</span>
-                  <span className="text-[12px] font-black text-black uppercase tracking-widest">Produtos que Compõe esse Transporte</span>
-                </div>
-                
-                <div className="overflow-x-auto flex-1">
-                  <table className="w-full text-left text-[12px]">
-                    <thead className="bg-slate-50 text-black font-black uppercase text-[12px] border-b border-blue-150">
-                      <tr>
-                        <th className="py-2.5 px-4 w-[70%]">Descrição do Material</th>
-                        <th className="py-2.5 px-3 text-center w-[30%]">Quantidade Saída</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {products.map(p => (
-                        <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                          {/* Descrição do Material */}
-                          <td className="py-2.5 px-4">
-                            <p className="font-black text-black uppercase text-[12px]">{p.description}</p>
-                          </td>
-                          
-                          {/* Quantidade Saída Input Field */}
-                          <td className="py-2 px-3 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              placeholder="0"
-                              value={productQuantities[p.id] || ''}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                // Ensure it does not exceed the available physical stock
-                                const num = parseInt(val, 10) || 0;
-                                if (num > p.initialStock) {
-                                  setProductQuantities(prev => ({
-                                    ...prev,
-                                    [p.id]: String(p.initialStock)
-                                  }));
-                                } else {
-                                  setProductQuantities(prev => ({
-                                    ...prev,
-                                    [p.id]: val
-                                  }));
-                                }
+                      {/* Suggester Box for Route */}
+                      {transportMode === 'rota' && showRouteSuggest && (
+                        <div className="absolute top-[58px] left-0 w-full z-30 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto min-w-[200px]">
+                          {filteredRoutes.map(r => (
+                            <button
+                              key={r.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedRoute(r);
+                                setRouteInput(`RT-${r.numeroRota} - ${r.cidade}`);
+                                setRouteError('');
+                                setShowRouteSuggest(false);
                               }}
-                              className="w-20 h-8 px-2 text-center text-xs font-bold text-blue-700 bg-blue-50 border border-blue-300 rounded-lg outline-hidden focus:ring-1 focus:ring-blue-500"
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                      {products.length === 0 && (
-                        <tr>
-                          <td colSpan={2} className="py-6 text-center text-gray-400 italic">Nenhum produto cadastrado no estoque de armazém.</td>
-                        </tr>
+                              className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors text-xs font-semibold text-slate-800 flex flex-col border-b border-gray-50 last:border-0"
+                            >
+                              <span className="text-blue-600 font-extrabold text-[11px]">RT-{r.numeroRota} - {r.cidade}</span>
+                              <span className="text-gray-400 text-[9px]">{r.bairroRegiao}</span>
+                            </button>
+                          ))}
+                          {filteredRoutes.length === 0 && (
+                            <p className="p-2 text-center text-[11px] text-gray-400 italic">Nenhuma rota encontrada</p>
+                          )}
+                        </div>
                       )}
-                    </tbody>
-                  </table>
+                    </div>
+
+                  </div>
+
                 </div>
               </div>
             </div>
 
             {/* Row 2: "Clientes Atendidos" (lg:col-span-12) */}
             <div className="bg-white border border-blue-500 rounded-xl shadow-xs overflow-hidden flex flex-col w-full text-black text-[12px] font-bold">
-              <div className="bg-gray-100 px-4 py-3 border-b border-blue-200 flex items-center justify-between">
+              <div className="bg-gray-100 px-4 py-3 border-b border-blue-200 flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-blue-600 text-sm">groups</span>
                   <span className="text-[12px] font-black text-black uppercase tracking-widest">Clientes Atendidos</span>
                 </div>
-                {activeClients.length > 0 && (
-                  <label className="flex items-center gap-1.5 text-[12px] font-bold text-black cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={activeClients.length > 0 && activeClients.every(c => selectedClientIds[c.id])}
-                      onChange={(e) => handleSelectAllClients(e.target.checked)}
-                      className="w-3.5 h-3.5 border-gray-300 text-blue-600 focus:ring-blue-500 rounded-xs cursor-pointer"
-                    />
-                    <span>Selecionar Todos</span>
-                  </label>
+
+                {/* Filters aligned on the same header line */}
+                {baseActiveClients.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-4 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <label htmlFor="search-field-select" className="text-[10px] font-black text-slate-700 uppercase whitespace-nowrap">Pesquisar por:</label>
+                      <select
+                        id="search-field-select"
+                        value={clientSearchField}
+                        onChange={(e) => {
+                          setClientSearchField(e.target.value as any);
+                          setClientSearchQuery('');
+                        }}
+                        className="bg-white border border-blue-200 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-400 h-7"
+                      >
+                        <option value="matricula">Matricula</option>
+                        <option value="razaoSocial">Razão Social</option>
+                        <option value="cnpj">CNPJ</option>
+                        <option value="rotaEntrega">Rota de Entrega</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <label htmlFor="search-query-input" className="text-[10px] font-black text-slate-700 uppercase whitespace-nowrap">Pesquisa:</label>
+                      <input
+                        id="search-query-input"
+                        type="text"
+                        value={clientSearchQuery}
+                        onChange={(e) => setClientSearchQuery(e.target.value)}
+                        className="bg-white border border-blue-200 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-400 w-44 h-7"
+                      />
+                    </div>
+
+                    {/* Selecionar Todos checkbox */}
+                    <label className="flex items-center gap-1.5 text-[11px] font-bold text-black cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={activeClients.length > 0 && activeClients.every(c => selectedClientIds[c.id])}
+                        onChange={(e) => handleSelectAllClients(e.target.checked)}
+                        className="w-3.5 h-3.5 border-gray-300 text-blue-600 focus:ring-blue-500 rounded-xs cursor-pointer"
+                      />
+                      <span>Selecionar Todos</span>
+                    </label>
+                  </div>
                 )}
               </div>
 
               {/* Clients Checklist as a Grid */}
               <div className="p-4 bg-slate-50/50">
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-80 overflow-y-auto pr-1">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 max-h-80 overflow-y-auto pr-1">
                   {activeClients.map(c => {
                     const isSelected = !!selectedClientIds[c.id];
                     return (
@@ -1051,6 +1060,9 @@ export default function CreateTransportModal() {
                           <span className="font-black text-black uppercase truncate">{c.razaoSocial}</span>
                           <span className="text-[11px] text-gray-750 font-bold uppercase tracking-wider mt-0.5">
                             Matrícula: {c.matricula} • <span className="text-blue-600 font-black">Rota: {c.rotaEntrega}</span>
+                          </span>
+                          <span className="text-[11px] text-gray-600 font-bold uppercase tracking-wider mt-0.5">
+                            CNPJ: {c.cnpj}
                           </span>
                         </div>
                       </label>
@@ -1234,39 +1246,7 @@ export default function CreateTransportModal() {
           </div>
         )}
 
-        {/* Caixa de Mensagem: Sem Quantidade */}
-        {showZeroQtyConfirmDialog && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-            <div className="bg-white w-full max-w-md rounded-2xl border border-red-200 shadow-2xl p-6 text-center space-y-4">
-              <div className="flex flex-col items-center gap-2 text-amber-500">
-                <span className="material-symbols-outlined text-5xl">warning</span>
-                <h3 className="text-base font-black uppercase tracking-wider mt-2">Atenção</h3>
-              </div>
-              <p className="text-slate-800 text-sm font-medium leading-relaxed">
-                Nenhuma quantidade de Produtos informada, deseja realmente continuar?
-              </p>
-              <div className="flex justify-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowZeroQtyConfirmDialog(false)}
-                  className="px-5 py-2 border border-gray-300 hover:bg-gray-100 rounded-xl text-xs font-bold text-gray-700 uppercase tracking-wider transition-all cursor-pointer"
-                >
-                  Não
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowZeroQtyConfirmDialog(false);
-                    handleGravarTransporte(true); // call bypass check
-                  }}
-                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-xs uppercase tracking-wider transition-all shadow-md shadow-blue-500/10 cursor-pointer"
-                >
-                  Sim
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+
 
         {/* Sub-window modal: EXCLUIR TRANSPORTES */}
         {showExcluirTransportesModal && (

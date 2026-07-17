@@ -13,6 +13,7 @@ import LogisticDashboardView from '../components/LogisticDashboardView';
 import SuporteView from '../components/SuporteView';
 import CreateTransportModal from '../components/CreateTransportModal';
 import VeiculoEntregaModal from '../components/VeiculoEntregaModal';
+import LancarSaidaModal from '../components/LancarSaidaModal';
 import ConferenciaModal from '../components/ConferenciaModal';
 import ContagemClienteModal from '../components/ContagemClienteModal';
 import ConfigSupabaseModal from '../components/ConfigSupabaseModal';
@@ -123,6 +124,7 @@ function AppShellContent() {
       </div>
 
       {selectedAction === 'criar_transporte' && <CreateTransportModal />}
+      {selectedAction === 'lancar_saida' && <LancarSaidaModal />}
       {selectedAction === 'veiculo_entrega' && <VeiculoEntregaModal />}
       {selectedAction === 'conferencia' && <ConferenciaModal />}
       {selectedAction === 'contagem_cliente' && <ContagemClienteModal />}

@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useApp } from '../lib/AppContext';
 import { Transport, Client } from '../lib/types';
 
-export default function VeiculoEntregaModal() {
+export default function LancarSaidaModal() {
   const {
     activeTransports,
     transports,
@@ -14,6 +14,7 @@ export default function VeiculoEntregaModal() {
     setSelectedAction,
     updateActiveTransport,
     updateClient,
+    updateProduct,
     userRole,
     getLoggedInUserName,
     setUserRole
@@ -21,9 +22,11 @@ export default function VeiculoEntregaModal() {
 
   // State to track if we are viewing details of a specific transport
   const [viewingTrpDetail, setViewingTrpDetail] = useState<Transport | null>(null);
+  const [lancarSaidaQuantities, setLancarSaidaQuantities] = useState<{ [productId: string]: string }>({});
 
   // Selected transport ID state for selectability
   const [selectedTrpId, setSelectedTrpId] = useState<string | null>(null);
+  const [showLancarSaidaZeroQtyConfirm, setShowLancarSaidaZeroQtyConfirm] = useState(false);
 
   // Retirada States
   const [isCreatingRetirada, setIsCreatingRetirada] = useState(false);
@@ -39,9 +42,6 @@ export default function VeiculoEntregaModal() {
   const [pickupQuantities, setPickupQuantities] = useState<{ [productId: string]: number | '' }>({});
   const [isEntregaOkSemMov, setIsEntregaOkSemMov] = useState(false);
   const [isNaoRealizadaEntrega, setIsNaoRealizadaEntrega] = useState(false);
-  const [showMotivoModal, setShowMotivoModal] = useState(false);
-  const [motivoNaoEntrega, setMotivoNaoEntrega] = useState('Fechado');
-  const [clientFilterStatus, setClientFilterStatus] = useState<string>('Todos');
 
   const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
   const [showSobrasModal, setShowSobrasModal] = useState(false);
@@ -78,28 +78,264 @@ export default function VeiculoEntregaModal() {
         clienteTotal: t.clientsCount,
         clienteEntregue: t.delivered,
         clienteNaoEntregue: t.notDelivered,
+        clienteEmEntrega: 0,
       } as any
     }))
   ];
 
-  // Filter only those with status "SAIDA" or "EM ENTREGA"
+  // Filter ONLY transports with status "CRIADO" as requested
   let filteredTransports = displayTransports.filter(t => {
     const s = t.status.toString().toUpperCase().replace('_', ' ');
-    return s === 'SAIDA' || s === 'SAÍDA' || s === 'EM ENTREGA';
+    return s === 'CRIADO';
   });
 
-  // Commented out or removed to allow Entregador profile to view and access all active transports enabled for this screen
-  /*
-  if (userRole === 'Entregador') {
-    const driverName = getLoggedInUserName() || '';
-    filteredTransports = filteredTransports.filter(t => 
-      t.driver && t.driver.trim().toLowerCase() === driverName.trim().toLowerCase()
+  // If viewing details of a specific transport, render the detailed view with blue highlights
+  if (viewingTrpDetail) {
+    const handleConfirmLancarSaida = (bypassQtyCheck = false) => {
+      if (!bypassQtyCheck) {
+        const totalQty = products.reduce((sum, p) => sum + (parseInt(lancarSaidaQuantities[p.id] || '0', 10) || 0), 0);
+        if (totalQty === 0) {
+          setShowLancarSaidaZeroQtyConfirm(true);
+          return;
+        }
+      }
+
+      // 1. Calculate stock updates for products and update them
+      products.forEach(p => {
+        const oldQty = viewingTrpDetail.stock?.[p.id]?.veiculo || 0;
+        const newQty = parseInt(lancarSaidaQuantities[p.id] || '0', 10) || 0;
+        const diff = newQty - oldQty;
+
+        if (diff !== 0) {
+          const updatedProd = {
+            ...p,
+            initialStock: Math.max(0, p.initialStock - diff)
+          };
+          updateProduct(updatedProd);
+        }
+      });
+
+      // 2. Build the updated stock object for the transport
+      const updatedTransportStock: {
+        [productId: string]: {
+          veiculo: number;
+          entrega: number;
+          coleta: number;
+          cliente: number;
+          saidaEntrega?: number;
+        };
+      } = {};
+
+      products.forEach(p => {
+        const qtyOut = parseInt(lancarSaidaQuantities[p.id] || '0', 10) || 0;
+        updatedTransportStock[p.id] = {
+          veiculo: qtyOut,
+          entrega: qtyOut,
+          coleta: 0,
+          cliente: 0,
+          saidaEntrega: qtyOut
+        };
+      });
+
+      // 3. Mark the transport status as 'SAIDA', update clients to 'Em Entrega'
+      const clientIds = viewingTrpDetail.selectedClientIds || [];
+      clientIds.forEach(cid => {
+        const clientObj = clients.find(c => c.id === cid);
+        if (clientObj) {
+          updateClient({
+            ...clientObj,
+            statusEntrega: 'Em Entrega'
+          });
+        }
+      });
+
+      const updatedTransport: Transport = {
+        ...viewingTrpDetail,
+        statusTransporte: 'SAIDA' as any,
+        stock: updatedTransportStock,
+        observation: `Lançada Saída para Transporte. Quantidades confirmadas. Rota: ${viewingTrpDetail.route}`,
+      };
+
+      // 4. Update the active transport state
+      updateActiveTransport(updatedTransport);
+
+      // 5. Success feedback and close details
+      setSuccessMessage(`Saída do Transporte ${viewingTrpDetail.number} lançada com sucesso!`);
+      setViewingTrpDetail(null);
+      setSelectedTrpId(null);
+    };
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-200 overflow-y-auto">
+        <div className="bg-[#f3f4f6] w-full max-w-4xl rounded-2xl overflow-hidden border border-blue-600/30 shadow-2xl flex flex-col h-[90vh] my-4">
+          
+          {/* Header Bar: Vibrant Blue */}
+          <div className="bg-blue-600 px-6 py-4 flex items-center justify-between text-white flex-shrink-0 relative">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-white text-3xl font-bold">local_shipping</span>
+              <div>
+                <h3 className="text-lg font-black uppercase tracking-wider font-sans">Lançar Saída (Confirmar Carga)</h3>
+                <p className="text-xs font-bold text-blue-100 mt-0.5">
+                  Transporte Nº {viewingTrpDetail.number} | Placa: {viewingTrpDetail.placa} | Motorista: {viewingTrpDetail.driver}
+                </p>
+              </div>
+            </div>
+            <button 
+              type="button"
+              onClick={() => {
+                setViewingTrpDetail(null);
+                setSelectedTrpId(null);
+              }}
+              className="text-white hover:text-black/75 transition-colors p-1.5 rounded-full hover:bg-white/20 flex items-center justify-center"
+            >
+              <span className="material-symbols-outlined font-bold text-xl">close</span>
+            </button>
+          </div>
+
+          {/* Body Content */}
+          <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-[#f3f4f6] flex flex-col justify-between">
+            
+            <div className="grid grid-cols-1 gap-6 items-stretch flex-1">
+              {/* Column: "Produtos que Compõe esse Transporte" */}
+              <div className="bg-white border border-blue-500 rounded-xl shadow-xs overflow-hidden flex flex-col self-stretch text-black text-[12px] font-bold">
+                <div className="bg-gray-100 px-4 py-3 border-b border-blue-200 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-blue-600 text-sm">inventory_2</span>
+                  <span className="text-[12px] font-black text-black uppercase tracking-widest">Produtos que Compõe esse Transporte</span>
+                </div>
+                
+                <div className="overflow-x-auto flex-1 max-h-[50vh]">
+                  <table className="w-full text-left text-[12px]">
+                    <thead className="bg-slate-50 text-black font-black uppercase text-[12px] border-b border-blue-150 sticky top-0 z-10">
+                      <tr>
+                        <th className="py-2.5 px-4 w-[50%]">Descrição do Material</th>
+                        <th className="py-2.5 px-4 text-center w-[25%]">Estoque Disponível</th>
+                        <th className="py-2.5 px-3 text-center w-[25%]">Quantidade Saída</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {[...products].sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' })).map(p => {
+                        const currentQtyOnTrp = viewingTrpDetail.stock?.[p.id]?.veiculo || 0;
+                        const maxAvailable = p.initialStock + currentQtyOnTrp;
+                        const val = lancarSaidaQuantities[p.id] || '';
+
+                        return (
+                          <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                            {/* Descrição do Material */}
+                            <td className="py-2.5 px-4">
+                              <p className="font-black text-black uppercase text-[12px]">{p.description}</p>
+                            </td>
+
+                            {/* Estoque Disponível */}
+                            <td className="py-2.5 px-4 text-center font-bold text-slate-600">
+                              {maxAvailable} {p.unit || 'UN'}
+                            </td>
+                            
+                            {/* Quantidade Saída Input Field */}
+                            <td className="py-2 px-3 text-center">
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={val}
+                                onChange={(e) => {
+                                  const inputVal = e.target.value;
+                                  const num = parseInt(inputVal, 10) || 0;
+                                  if (num > maxAvailable) {
+                                    setLancarSaidaQuantities(prev => ({
+                                      ...prev,
+                                      [p.id]: String(maxAvailable)
+                                    }));
+                                  } else {
+                                    setLancarSaidaQuantities(prev => ({
+                                      ...prev,
+                                      [p.id]: inputVal
+                                    }));
+                                  }
+                                }}
+                                className="w-24 h-8 px-2 text-center text-xs font-bold text-blue-700 bg-blue-50 border border-blue-300 rounded-lg outline-hidden focus:ring-1 focus:ring-blue-500"
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {products.length === 0 && (
+                        <tr>
+                          <td colSpan={3} className="py-6 text-center text-gray-400 italic">Nenhum produto cadastrado no estoque de armazém.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-between gap-4 mt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  setViewingTrpDetail(null);
+                  setSelectedTrpId(null);
+                }}
+                className="px-5 py-2.5 bg-gray-500 hover:bg-gray-600 text-white font-extrabold text-[12px] uppercase rounded-xl transition-all shadow-md active:scale-95"
+              >
+                Voltar
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => handleConfirmLancarSaida()}
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[12px] uppercase rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-sm font-bold">check_circle</span>
+                <span>Confirmar Quantidade</span>
+              </button>
+            </div>
+
+            {/* Confirmation Modal for Zero Qty */}
+            {showLancarSaidaZeroQtyConfirm && (
+              <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200 text-black">
+                <div className="bg-white w-full max-w-md rounded-2xl border border-red-200 shadow-2xl p-6 text-center space-y-4">
+                  <div className="flex flex-col items-center gap-2 text-amber-500">
+                    <span className="material-symbols-outlined text-5xl">warning</span>
+                    <h3 className="text-base font-black uppercase tracking-wider mt-2">Atenção</h3>
+                  </div>
+                  <p className="text-slate-800 text-sm font-bold leading-relaxed">
+                    Atenção! Nenhuma quantidade de Produtos informada, deseja realmente continuar?
+                  </p>
+                  <div className="flex justify-center gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowLancarSaidaZeroQtyConfirm(false)}
+                      className="px-5 py-2 border border-gray-300 hover:bg-gray-100 rounded-xl text-xs font-bold text-gray-700 uppercase tracking-wider transition-all cursor-pointer"
+                    >
+                      Não
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowLancarSaidaZeroQtyConfirm(false);
+                        handleConfirmLancarSaida(true);
+                      }}
+                      className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-xs uppercase tracking-wider transition-all shadow-md shadow-blue-500/10 cursor-pointer"
+                    >
+                      Sim
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+      </div>
     );
   }
-  */
 
-  // If viewing details of a specific transport, render the custom dark themed detailed sub-modal
-  if (viewingTrpDetail) {
+  // If viewing details of a specific transport (old, skipped)
+  if (false) {
+    const viewingTrpDetail: any = null;
+    const lancingClient: any = null;
     const transportProducts = products.filter(p => {
       const s = viewingTrpDetail.stock?.[p.id];
       return s && (s.veiculo > 0 || s.coleta > 0 || s.cliente > 0);
@@ -110,11 +346,11 @@ export default function VeiculoEntregaModal() {
     );
 
     if (isLancingRetiradaQty) {
-      const currentClient = clients.find(c => c.id === checkedRetiradaClientId);
+      const currentClient: any = clients.find(c => c.id === checkedRetiradaClientId) || {};
 
       return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-200 overflow-y-auto">
-          <div className="bg-white w-full max-w-4xl rounded-2xl overflow-hidden border border-[#9333ea]/30 shadow-2xl flex flex-col h-[90vh] my-4">
+          <div className="bg-white w-full max-w-4xl rounded-2xl overflow-hidden border border-blue-600/30 shadow-2xl flex flex-col h-[90vh] my-4">
             
             {/* Header */}
             <div className="bg-sky-400 px-6 py-4 flex items-center justify-between text-slate-900 flex-shrink-0 border-b border-sky-300">
@@ -149,18 +385,35 @@ export default function VeiculoEntregaModal() {
                       <tr>
                         <th className="py-3 px-4 text-xs font-black text-slate-700 uppercase tracking-wider border-r border-slate-100">Código do Produto</th>
                         <th className="py-3 px-4 text-xs font-black text-slate-700 uppercase tracking-wider border-r border-slate-100">Descrição do Produto</th>
-                        <th className="py-3 px-4 text-xs font-black text-slate-700 uppercase tracking-wider text-center">Qtde a ser Retirada</th>
+                        <th className="py-3 px-4 text-xs font-black text-slate-700 uppercase tracking-wider text-center border-r border-slate-100">Saldo em Loja</th>
+                        <th className="py-3 px-4 text-xs font-black text-slate-700 uppercase tracking-wider text-center border-r border-slate-100">Qtde a ser Retirada</th>
+                        <th className="py-3 px-4 text-xs font-black text-slate-700 uppercase tracking-wider text-center">Saldo Negativo</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {products.map((p) => {
                         const val = retiradaQuantities[p.id] || '';
 
+                        const clientProdBalance = currentClient ? (
+                          (currentClient.productBalances && currentClient.productBalances[p.id] !== undefined)
+                            ? (currentClient.productBalances[p.id] || 0)
+                            : (() => {
+                                const pIdx = products.findIndex(prod => prod.id === p.id);
+                                const pct = pIdx === 0 ? 0.5 : pIdx === 1 ? 0.35 : pIdx === 2 ? 0.15 : 0;
+                                return Math.floor((currentClient.saldoLoja || 0) * pct);
+                              })()
+                        ) : 0;
+
+                        const qtyRetirar = val === '' ? 0 : Number(val);
+                        const diff = qtyRetirar - clientProdBalance;
+                        const saldoNegativoValue = diff > 0 ? diff : '';
+
                         return (
                           <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                             <td className="py-2.5 px-4 border-r border-slate-100 text-xs font-bold text-slate-800 font-mono">{p.code}</td>
                             <td className="py-2.5 px-4 border-r border-slate-100 text-xs font-bold text-slate-800 uppercase">{p.description}</td>
-                            <td className="py-1.5 px-4 text-center whitespace-nowrap">
+                            <td className="py-2.5 px-4 border-r border-slate-100 text-xs font-bold text-slate-600 text-center">{clientProdBalance}</td>
+                            <td className="py-1.5 px-4 text-center whitespace-nowrap border-r border-slate-100">
                               <input
                                 type="number"
                                 min="0"
@@ -176,6 +429,7 @@ export default function VeiculoEntregaModal() {
                                 className="w-32 bg-white border border-slate-300 rounded-lg px-3 py-1 text-center text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-400"
                               />
                             </td>
+                            <td className="py-2.5 px-4 text-xs font-extrabold text-red-600 text-center font-mono">{saldoNegativoValue}</td>
                           </tr>
                         );
                       })}
@@ -217,7 +471,7 @@ export default function VeiculoEntregaModal() {
                     const diff = qty - prevQty;
 
                     if (!updatedStock[p.id]) {
-                      updatedStock[p.id] = { veiculo: 0, entrega: 0, coleta: 0, cliente: 0 };
+                      updatedStock[p.id] = { veiculo: 0, coleta: 0, cliente: 0 };
                     }
                     
                     updatedStock[p.id] = {
@@ -233,7 +487,7 @@ export default function VeiculoEntregaModal() {
                   updateClient(updatedClient);
 
                   const otherSobras = (viewingTrpDetail.sobras || []).filter(
-                    s => s.matricula !== clientObj.matricula
+                    (s: any) => s.matricula !== clientObj.matricula
                   );
 
                   const currentSobras = [...otherSobras];
@@ -338,7 +592,7 @@ export default function VeiculoEntregaModal() {
           <div className="bg-blue-50 w-full max-w-5xl rounded-2xl overflow-hidden border border-sky-300 shadow-2xl flex flex-col h-[92vh] my-4">
             
             {/* Header Bar: Sky Blue */}
-            <div className="bg-sky-400 px-6 py-4 flex items-center justify-between text-slate-900 text-slate-900 flex-shrink-0 relative border-b border-sky-300">
+            <div className="bg-sky-400 px-6 py-4 flex items-center justify-between text-slate-900 flex-shrink-0 relative border-b border-sky-300">
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-slate-900 text-3xl font-bold">add_shopping_cart</span>
                 <div>
@@ -511,25 +765,7 @@ export default function VeiculoEntregaModal() {
       return 5;
     };
 
-    const filteredClients = transportClients.filter(c => {
-      if (clientFilterStatus === 'Todos') return true;
-      const s = (c.statusEntrega || 'Em Entrega').toLowerCase();
-      if (clientFilterStatus === 'Em Entrega') {
-        return s === 'em entrega';
-      }
-      if (clientFilterStatus === 'Entregue') {
-        return s === 'entregue';
-      }
-      if (clientFilterStatus === 'Não Entregue') {
-        return s === 'retornado' || s === 'não entregue';
-      }
-      if (clientFilterStatus === 'Retirado') {
-        return s === 'coletado' || s === 'retirada';
-      }
-      return true;
-    });
-
-    const sortedClients = [...filteredClients].sort((a, b) => {
+    const sortedClients = [...transportClients].sort((a, b) => {
       return getStatusRank(a.statusEntrega) - getStatusRank(b.statusEntrega);
     });
 
@@ -572,7 +808,6 @@ export default function VeiculoEntregaModal() {
           actionBtnText: 'EDITAR'
         };
       } else {
-        // default/em entrega -> AMARELO
         return {
           text: 'text-yellow-600 font-bold text-[10px]',
           badgeBg: 'bg-yellow-50 border border-yellow-500/30 text-yellow-600 font-bold text-[10px]',
@@ -587,11 +822,9 @@ export default function VeiculoEntregaModal() {
     const handleSalvarESair = () => {
       const hasEmEntrega = transportClients.some(c => !c.statusEntrega || c.statusEntrega.toLowerCase() === 'em entrega');
       if (hasEmEntrega) {
-        // salvar as alterações no transporte e sair indo para a tela de transportes em aberto
         updateActiveTransport(viewingTrpDetail);
         setViewingTrpDetail(null);
       } else {
-        // abrir uma caixa de aviso
         setShowSalvarESairWarning(true);
       }
     };
@@ -625,7 +858,6 @@ export default function VeiculoEntregaModal() {
         clientesRetirados: retiradaCount,
       };
 
-      // Modificar o "Status de Entrega" dos clientes do Transporte para "Em Liquidação"
       transportClients.forEach(c => {
         updateClient({
           ...c,
@@ -636,7 +868,6 @@ export default function VeiculoEntregaModal() {
       updateActiveTransport(finalizedTransport);
       setShowFinalizeSummary(false);
 
-      // Mostrar mensagem temporária de aviso por 3 segundos
       setSuccessMessage(`Entregas do Transporte ${viewingTrpDetail.number} finalizadas com sucesso!`);
 
       setTimeout(() => {
@@ -675,9 +906,7 @@ export default function VeiculoEntregaModal() {
       setDeliveryQuantities(initialDeliveries);
       setPickupQuantities(initialPickups);
       setIsEntregaOkSemMov(false);
-      setIsNaoRealizadaEntrega(client.statusEntrega === 'Retornado');
-      setMotivoNaoEntrega(client.motivoNaoEntrega || 'Fechado');
-      setShowMotivoModal(false);
+      setIsNaoRealizadaEntrega(false);
     };
 
     const hasInsufficientStock = transportProducts.some(p => {
@@ -748,12 +977,11 @@ export default function VeiculoEntregaModal() {
         statusEntrega: newStatus,
         pickupQuantities: clientPickupQtys,
         deliveryQuantities: clientDeliveryQtys,
-        motivoNaoEntrega: isNaoRealizadaEntrega ? motivoNaoEntrega : undefined,
       };
       updateClient(updatedClient);
 
       const otherSobras = (viewingTrpDetail.sobras || []).filter(
-        s => s.matricula !== lancingClient.matricula
+        (s: any) => s.matricula !== lancingClient.matricula
       );
 
       const currentSobras = [...otherSobras];
@@ -819,19 +1047,19 @@ export default function VeiculoEntregaModal() {
       setLancingClient(null);
     };
 
-    // Sub-modal for Lancing (Lançamento)
+    // Sub-modal for Lancing (Lançamento) with blue accents
     if (lancingClient) {
       return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/65 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-gray-100 w-full max-w-5xl rounded-2xl overflow-hidden border border-purple-200 shadow-2xl flex flex-col h-[92vh] my-4">
+          <div className="bg-gray-100 w-full max-w-5xl rounded-2xl overflow-hidden border border-blue-200 shadow-2xl flex flex-col h-[92vh] my-4">
             
-            {/* Header: Purple matching theme */}
-            <div className="bg-[#9333ea] px-6 py-4 flex items-center justify-between text-white flex-shrink-0 relative">
+            {/* Header: Blue matching theme */}
+            <div className="bg-blue-600 px-6 py-4 flex items-center justify-between text-white flex-shrink-0 relative">
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-white text-3xl">local_shipping</span>
                 <div>
                   <h3 className="text-lg font-black uppercase tracking-wider">Dados do Transporte</h3>
-                  <p className="text-[10px] text-purple-100 font-bold uppercase tracking-wider">Lançamento e controle de cargas e coletas em rota</p>
+                  <p className="text-[10px] text-blue-100 font-bold uppercase tracking-wider">Lançamento e controle de cargas e coletas em rota</p>
                 </div>
               </div>
               <button 
@@ -920,16 +1148,35 @@ export default function VeiculoEntregaModal() {
                     <span className="text-[10px]">●</span> Lançar retirada de produto
                   </h4>
                   <div className="bg-blue-100 text-blue-950 p-2 border border-blue-300 rounded-lg overflow-hidden flex-1 flex flex-col">
-                    <div className="grid grid-cols-2 text-[9px] font-extrabold uppercase tracking-wider text-blue-800 mb-1.5 pb-1 border-b border-blue-200 text-center">
+                    <div className="grid grid-cols-4 text-[9px] font-extrabold uppercase tracking-wider text-blue-800 mb-1.5 pb-1 border-b border-blue-200 text-center">
                       <div className="text-left">ITEM</div>
+                      <div>SALDO LOJA</div>
                       <div>QTD RETIRAR</div>
+                      <div>SALDO NEGATIVO</div>
                     </div>
                     <div className="space-y-1 overflow-y-auto max-h-[130px]">
                       {transportProducts.map(p => {
+                        const clientProdBalance = lancingClient ? (
+                          (lancingClient.productBalances && lancingClient.productBalances[p.id] !== undefined)
+                            ? (lancingClient.productBalances[p.id] || 0)
+                            : (() => {
+                                const pIdx = products.findIndex(prod => prod.id === p.id);
+                                const pct = pIdx === 0 ? 0.5 : pIdx === 1 ? 0.35 : pIdx === 2 ? 0.15 : 0;
+                                return Math.floor((lancingClient.saldoLoja || 0) * pct);
+                              })()
+                        ) : 0;
+
+                        const qtyRetirar = pickupQuantities[p.id] === '' ? 0 : Number(pickupQuantities[p.id] || 0);
+                        const diff = qtyRetirar - clientProdBalance;
+                        const saldoNegativoValue = diff > 0 ? diff : '';
+
                         return (
-                          <div key={p.id} className="grid grid-cols-2 items-center text-xs py-1 text-center border-b border-blue-100/50 last:border-0">
+                          <div key={p.id} className="grid grid-cols-4 items-center text-xs py-1 text-center border-b border-blue-100/50 last:border-0">
                             <div className="text-left font-bold uppercase text-[9px] text-blue-900 truncate pr-1" title={p.description}>
                               {p.description}
+                            </div>
+                            <div className="font-bold text-[10px] text-blue-800">
+                              {clientProdBalance}
                             </div>
                             <div className="flex justify-center">
                               <input
@@ -944,6 +1191,9 @@ export default function VeiculoEntregaModal() {
                                 }}
                                 className="w-16 bg-white border border-blue-400 rounded text-center text-xs font-black py-0.5 text-blue-950 placeholder:text-blue-300 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
                               />
+                            </div>
+                            <div className="font-extrabold text-[10px] text-red-600 font-mono">
+                              {saldoNegativoValue}
                             </div>
                           </div>
                         );
@@ -990,23 +1240,16 @@ export default function VeiculoEntregaModal() {
                     checked={isNaoRealizadaEntrega}
                     disabled={isNaoRealizadaDisabled}
                     onChange={(e) => {
-                      const checked = e.target.checked;
-                      setIsNaoRealizadaEntrega(checked);
-                      if (checked) {
+                      setIsNaoRealizadaEntrega(e.target.checked);
+                      if (e.target.checked) {
                         setIsEntregaOkSemMov(false);
-                        setShowMotivoModal(true);
                       }
                     }}
                     className="w-5 h-5 rounded border-red-300 text-red-600 focus:ring-red-500 cursor-pointer accent-red-600 flex-shrink-0"
                   />
                   <div>
-                    <label htmlFor="nao-realizada-checkbox" className="text-xs font-black text-red-800 uppercase cursor-pointer flex flex-wrap items-center gap-1.5">
-                      <span>Não será realizada Entrega</span>
-                      {isNaoRealizadaEntrega && (
-                        <span className="text-[9px] font-black bg-red-600 text-white px-1.5 py-0.5 rounded-sm uppercase tracking-wider">
-                          Motivo: {motivoNaoEntrega}
-                        </span>
-                      )}
+                    <label htmlFor="nao-realizada-checkbox" className="text-xs font-black text-red-800 uppercase cursor-pointer">
+                      Não será realizada Entrega
                     </label>
                     <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
                       Marca cliente como retornado/não atendido para esta viagem sem carregar alterações.
@@ -1016,7 +1259,7 @@ export default function VeiculoEntregaModal() {
 
               </div>
 
-              {/* Botões dentro do fluxo da tela na parte inferior (não fixos) */}
+              {/* Botões dentro do fluxo da tela na parte inferior */}
               <div className="border-t border-slate-200 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
                   <h4 className="text-xs font-black text-slate-800 uppercase">{lancingClient.razaoSocial}</h4>
@@ -1054,62 +1297,6 @@ export default function VeiculoEntregaModal() {
                 </div>
               )}
 
-              {/* Modal/Overlay: Motivo da não entrega */}
-              {showMotivoModal && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/65 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-                  <div className="bg-white border-2 border-red-500 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 text-black">
-                    <div className="flex items-center gap-3 text-red-600 border-b border-red-100 pb-2">
-                      <span className="material-symbols-outlined text-3xl font-bold">report_problem</span>
-                      <h3 className="text-lg font-black uppercase tracking-wider">Motivo da não entrega</h3>
-                    </div>
-                    
-                    <p className="text-slate-750 text-xs font-bold uppercase tracking-wider">
-                      Selecione o motivo obrigatório para a não realização da entrega:
-                    </p>
-
-                    <div className="space-y-1.5">
-                      <label htmlFor="motivo-select" className="text-[11px] font-black text-slate-700 uppercase tracking-wider block">
-                        Motivo <span className="text-red-600 font-bold">*</span>
-                      </label>
-                      <select
-                        id="motivo-select"
-                        value={motivoNaoEntrega}
-                        onChange={(e) => setMotivoNaoEntrega(e.target.value)}
-                        className="w-full bg-white border-2 border-red-200 rounded-xl px-3 py-2.5 text-xs font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-red-400"
-                      >
-                        <option value="Fechado">Fechado</option>
-                        <option value="Fora de Rota">Fora de Rota</option>
-                        <option value="Não fez pedido">Não fez pedido</option>
-                        <option value="Produto Danificado">Produto Danificado</option>
-                        <option value="Estouro de Jornada">Estouro de Jornada</option>
-                      </select>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsNaoRealizadaEntrega(false);
-                          setShowMotivoModal(false);
-                        }}
-                        className="px-4 py-2 bg-gray-150 hover:bg-gray-250 text-slate-700 font-extrabold text-xs uppercase rounded-lg transition-all"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowMotivoModal(false);
-                        }}
-                        className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs uppercase rounded-lg transition-all shadow-md active:scale-95"
-                      >
-                        Confirmar Motivo
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
             </div>
 
           </div>
@@ -1119,10 +1306,10 @@ export default function VeiculoEntregaModal() {
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-200 overflow-y-auto">
-        <div className="bg-[#f3f4f6] w-full max-w-6xl rounded-2xl overflow-hidden border border-[#9333ea]/30 shadow-2xl flex flex-col h-[92vh] my-4">
+        <div className="bg-[#f3f4f6] w-full max-w-5xl rounded-2xl overflow-hidden border border-blue-600/30 shadow-2xl flex flex-col h-[92vh] my-4">
           
-          {/* Header Bar: Vibrant Purple */}
-          <div className="bg-[#9333ea] px-6 py-4 flex items-center justify-between text-white flex-shrink-0 relative">
+          {/* Header Bar: Vibrant Blue */}
+          <div className="bg-blue-600 px-6 py-4 flex items-center justify-between text-white flex-shrink-0 relative">
             <div className="flex items-center gap-3">
               <span className="material-symbols-outlined text-white text-3xl">local_shipping</span>
               <div>
@@ -1143,45 +1330,39 @@ export default function VeiculoEntregaModal() {
             
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch flex-1">
               
-              {/* LEFT COLUMN: Resumo do Transporte (takes 5/12 columns, approx 40%) & Itens do Transporte */}
+              {/* LEFT COLUMN: Resumo do Transporte */}
               <div className="md:col-span-5 space-y-6 flex flex-col h-full">
                 
-                {/* NEW QUADRANT: SUMMARY & COUNTERS (NOW ON TOP) */}
-                <div className="border-2 border-[#9333ea] rounded-xl bg-white shadow-xs overflow-hidden flex-shrink-0">
-                  <div className="bg-purple-50 px-4 py-2.5 border-b border-purple-200">
-                    <h4 className="text-xs font-black text-[#9333ea] uppercase tracking-wider">
+                {/* SUMMARY & COUNTERS with Blue theme */}
+                <div className="border-2 border-blue-600 rounded-xl bg-white shadow-xs overflow-hidden flex-shrink-0">
+                  <div className="bg-blue-50 px-4 py-2.5 border-b border-blue-200">
+                    <h4 className="text-xs font-black text-blue-600 uppercase tracking-wider">
                       Resumo do Transporte
                     </h4>
                   </div>
                   <div className="p-2.5">
-                    {/* Single outer container for all information with border */}
-                    <div className="border border-purple-300 rounded-xl p-2.5 bg-white flex flex-col gap-2.5">
-                      {/* Top Row: Total (Left) + Transport Info (Right) */}
+                    <div className="border border-blue-300 rounded-xl p-2.5 bg-white flex flex-col gap-2.5">
+                      {/* Top Row: Total + Transport Info */}
                       <div className="flex items-center justify-between gap-3 py-0.5">
-                        {/* Total counter square on the left */}
-                        <div className="bg-purple-50 border border-purple-500 px-1.5 py-1 rounded-md flex items-center justify-between text-left h-[28px] gap-1 w-[calc((100%-18px)/4)] shrink-0">
-                          <span className="text-[7.5px] font-bold text-purple-700 uppercase leading-none block">Clientes</span>
-                          <span className="text-xs font-black text-purple-900 leading-none">
+                        <div className="bg-blue-50 border border-blue-500 px-1.5 py-1 rounded-md flex items-center justify-between text-left h-[28px] gap-1 w-[calc((100%-18px)/4)] shrink-0">
+                          <span className="text-[7.5px] font-bold text-blue-700 uppercase leading-none block">Clientes</span>
+                          <span className="text-xs font-black text-blue-900 leading-none">
                             {viewingTrpDetail.statusTransporte === 'EM_LIQUIDACAO' || viewingTrpDetail.statusTransporte === 'Finalizado'
                               ? (viewingTrpDetail.clienteTotal ?? 0)
                               : transportClients.filter(c => (c.statusEntrega || '').toLowerCase() !== 'retirada').length}
                           </span>
                         </div>
 
-                        {/* Transport Info on the right */}
                         <div className="flex items-center gap-4">
-                          {/* Nº do Transporte */}
                           <div className="flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-purple-600 text-[12px]" title="Nº do Transporte">description</span>
+                            <span className="material-symbols-outlined text-blue-600 text-[12px]" title="Nº do Transporte">description</span>
                             <span className="font-black text-slate-800 text-[10px] uppercase tracking-wider">{viewingTrpDetail.number}</span>
                           </div>
                           
-                          {/* Divider */}
                           <div className="h-3.5 w-px bg-gray-200"></div>
 
-                          {/* Veículo (Placa) */}
                           <div className="flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-purple-600 text-[12px]" title="Veículo">local_shipping</span>
+                            <span className="material-symbols-outlined text-blue-600 text-[12px]" title="Veículo">local_shipping</span>
                             <span className="font-black text-slate-800 text-[10px] uppercase tracking-wider">{viewingTrpDetail.placa}</span>
                           </div>
                         </div>
@@ -1189,16 +1370,14 @@ export default function VeiculoEntregaModal() {
                       
                       {/* Bottom Row: Counters */}
                       <div className="grid grid-cols-4 gap-1.5">
-                        {/* Item 1: Em Entr. */}
                         <div className="bg-yellow-50 border border-yellow-500 px-1.5 py-1 rounded-md flex items-center justify-between text-left h-[28px] gap-1">
-                          <span className="text-[7px] font-bold text-yellow-700 uppercase leading-none block">Em Entrega</span>
+                          <span className="text-[7.5px] font-bold text-yellow-700 uppercase leading-none block">Em Entr.</span>
                           <span className="text-xs font-black text-yellow-900 leading-none">
                             {viewingTrpDetail.statusTransporte === 'EM_LIQUIDACAO' || viewingTrpDetail.statusTransporte === 'Finalizado'
                               ? (viewingTrpDetail.clienteEmEntrega ?? 0)
                               : transportClients.filter(c => !c.statusEntrega || c.statusEntrega.toLowerCase() === 'em entrega').length}
                           </span>
                         </div>
-                        {/* Item 2: Entregue */}
                         <div className="bg-green-50 border border-green-500 px-1.5 py-1 rounded-md flex items-center justify-between text-left h-[28px] gap-1">
                           <span className="text-[7.5px] font-bold text-green-700 uppercase leading-none block">Entregue</span>
                           <span className="text-xs font-black text-green-900 leading-none">
@@ -1207,7 +1386,6 @@ export default function VeiculoEntregaModal() {
                               : transportClients.filter(c => (c.statusEntrega || '').toLowerCase() === 'entregue').length}
                           </span>
                         </div>
-                        {/* Item 3: Retirada */}
                         <div className="bg-blue-50 border border-blue-500 px-1.5 py-1 rounded-md flex items-center justify-between text-left h-[28px] gap-1 shadow-3xs">
                           <span className="text-[7.5px] font-bold text-blue-700 uppercase leading-none block">Retirada</span>
                           <span className="text-xs font-black text-blue-900 leading-none">
@@ -1216,9 +1394,8 @@ export default function VeiculoEntregaModal() {
                               : transportClients.filter(c => (c.statusEntrega || '').toLowerCase() === 'retirada').length}
                           </span>
                         </div>
-                        {/* Item 4: Não Entr. */}
                         <div className="bg-red-50 border border-red-500 px-1.5 py-1 rounded-md flex items-center justify-between text-left h-[28px] gap-1">
-                          <span className="text-[7px] font-bold text-red-700 uppercase leading-none block">Não Entregue</span>
+                          <span className="text-[7.5px] font-bold text-red-700 uppercase leading-none block">Não Entr.</span>
                           <span className="text-xs font-black text-red-900 leading-none">
                             {viewingTrpDetail.statusTransporte === 'EM_LIQUIDACAO' || viewingTrpDetail.statusTransporte === 'Finalizado'
                               ? (viewingTrpDetail.clienteNaoEntregue ?? 0)
@@ -1230,31 +1407,30 @@ export default function VeiculoEntregaModal() {
                   </div>
                 </div>
 
-                {/* ITENS DO TRANSPORTE SECTION (NOW BELOW) */}
-                <div className="border-2 border-[#9333ea] rounded-xl bg-white shadow-xs overflow-hidden flex-1 flex flex-col">
-                  {/* Header row inside the quadrant */}
-                  <div className="bg-purple-50 px-4 py-2 border-b border-purple-200 flex items-center justify-between">
-                    <h4 className="text-xs font-black text-[#9333ea] uppercase tracking-wider">
+                {/* ITENS DO TRANSPORTE SECTION with Blue Theme */}
+                <div className="border-2 border-blue-600 rounded-xl bg-white shadow-xs overflow-hidden flex-1 flex flex-col">
+                  <div className="bg-blue-50 px-4 py-2 border-b border-blue-200 flex items-center justify-between">
+                    <h4 className="text-xs font-black text-blue-600 uppercase tracking-wider">
                       Itens do Transporte
                     </h4>
                     <button
                       type="button"
                       onClick={() => setShowSobrasModal(true)}
-                      className="flex items-center gap-1 px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors shadow-xs"
+                      className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors shadow-xs"
                     >
                       <span className="material-symbols-outlined text-[12px] font-bold">visibility</span>
                       Sobras
                     </button>
                   </div>
                   
-                  <div className="overflow-x-auto overflow-y-auto p-1 flex-1 max-h-[225px] scrollbar-thin">
+                  <div className="overflow-x-auto overflow-y-auto p-1 flex-1">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
                         <tr className="border-b border-gray-150 text-gray-500 font-extrabold uppercase text-[9px] tracking-wider">
                           <th className="py-2 px-2">Descrição</th>
                           <th className="py-2 px-1 text-center text-amber-600 leading-tight">Saída<br/>(Entrega)</th>
                           <th className="py-2 px-1 text-center text-cyan-600 leading-tight">Coleta<br/>(Retirada)</th>
-                          <th className="py-2 px-1 text-center text-purple-600 leading-tight">Entregue<br/>(Cliente)</th>
+                          <th className="py-2 px-1 text-center text-blue-600 leading-tight">Entregue<br/>(Cliente)</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
@@ -1268,7 +1444,7 @@ export default function VeiculoEntregaModal() {
                           transportProducts.map((p) => {
                             const s = viewingTrpDetail.stock?.[p.id] || { veiculo: 0, coleta: 0, cliente: 0 };
                             return (
-                              <tr key={p.id} className="hover:bg-purple-50/20 transition-colors">
+                              <tr key={p.id} className="hover:bg-blue-50/20 transition-colors">
                                 <td className="py-1.5 px-2 font-bold text-slate-800 uppercase text-[10px]">{p.description}</td>
                                 <td className="py-1.5 px-1 text-center font-black text-amber-600 text-[10px]">
                                   {(s.entrega !== undefined ? s.entrega : s.veiculo).toLocaleString('pt-BR')}
@@ -1276,7 +1452,7 @@ export default function VeiculoEntregaModal() {
                                 <td className="py-1.5 px-1 text-center font-black text-cyan-600 text-[10px]">
                                   {s.coleta.toLocaleString('pt-BR')}
                                 </td>
-                                <td className="py-1.5 px-1 text-center font-black text-purple-600 text-[10px]">
+                                <td className="py-1.5 px-1 text-center font-black text-blue-600 text-[10px]">
                                   {s.cliente.toLocaleString('pt-BR')}
                                 </td>
                               </tr>
@@ -1290,30 +1466,15 @@ export default function VeiculoEntregaModal() {
 
               </div>
 
-              {/* RIGHT COLUMN: Clientes Atendidos no Roteiro (takes 7/12 columns, approx 60%) */}
+              {/* RIGHT COLUMN: Clientes Atendidos no Roteiro */}
               <div className="md:col-span-7 flex flex-col h-full gap-4">
                 
-                {/* CLIENTES ATENDIDOS NO ROTEIRO SECTION */}
-                <div className="border-2 border-[#9333ea] rounded-xl bg-white shadow-xs overflow-hidden flex-1 flex flex-col">
-                  {/* Header row inside the quadrant */}
-                  <div className="bg-purple-50 px-4 py-2 border-b border-purple-200 flex items-center justify-between gap-3">
-                    <h4 className="text-xs font-black text-[#9333ea] uppercase tracking-wider">
+                {/* CLIENTES ATENDIDOS NO ROTEIRO SECTION with Blue Theme */}
+                <div className="border-2 border-blue-600 rounded-xl bg-white shadow-xs overflow-hidden flex-1 flex flex-col">
+                  <div className="bg-blue-50 px-4 py-2.5 border-b border-blue-200">
+                    <h4 className="text-xs font-black text-blue-600 uppercase tracking-wider">
                       Clientes Atendidos no Roteiro
                     </h4>
-                    <div>
-                      <select
-                        id="client-status-filter"
-                        value={clientFilterStatus}
-                        onChange={(e) => setClientFilterStatus(e.target.value)}
-                        className="bg-white border border-purple-300 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer"
-                      >
-                        <option value="Todos">Todos</option>
-                        <option value="Em Entrega">Em Entrega</option>
-                        <option value="Entregue">Entregue</option>
-                        <option value="Não Entregue">Não Entregue</option>
-                        <option value="Retirado">Retirado</option>
-                      </select>
-                    </div>
                   </div>
                   
                   <div className="overflow-x-auto overflow-y-auto p-1 flex-1">
@@ -1337,7 +1498,7 @@ export default function VeiculoEntregaModal() {
                           sortedClients.map((c) => {
                             const styles = getRowStyles(c.statusEntrega);
                             return (
-                              <tr key={c.id} className="hover:bg-purple-50/15 transition-colors">
+                              <tr key={c.id} className="hover:bg-blue-50/15 transition-colors">
                                 <td className="py-1 px-3 whitespace-nowrap">
                                   <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full ${styles.badgeBg} uppercase`}>
                                     <span className={`w-1.5 h-1.5 rounded-full ${styles.badgeDot} animate-pulse`}></span>
@@ -1379,14 +1540,14 @@ export default function VeiculoEntregaModal() {
 
           </div>
 
-          {/* Modal Footer Bar */}
-          <div className="bg-white px-6 py-4 border-t border-purple-100 flex flex-wrap items-center justify-end gap-3 flex-shrink-0">
+          {/* Modal Footer Bar with Blue highlights */}
+          <div className="bg-white px-6 py-4 border-t border-blue-100 flex flex-wrap items-center justify-end gap-3 flex-shrink-0">
             <button
               type="button"
-              disabled={viewingTrpDetail.statusTransporte === 'EM_LIQUIDACAO' || transportClients.some(c => !c.statusEntrega || c.statusEntrega.toLowerCase() === 'em entrega')}
+              disabled={viewingTrpDetail.statusTransporte === 'EM_LIQUIDACAO'}
               onClick={handleFinalizarEntrega}
               className={`px-4 py-2 text-white font-extrabold text-[11px] uppercase rounded-lg transition-all shadow-xs ${
-                (viewingTrpDetail.statusTransporte === 'EM_LIQUIDACAO' || transportClients.some(c => !c.statusEntrega || c.statusEntrega.toLowerCase() === 'em entrega'))
+                viewingTrpDetail.statusTransporte === 'EM_LIQUIDACAO'
                   ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-50'
                   : 'bg-[#10b981] hover:bg-[#059669] active:scale-95'
               }`}
@@ -1434,8 +1595,8 @@ export default function VeiculoEntregaModal() {
         {/* Modal: showFinalizeConfirm */}
         {showFinalizeConfirm && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-            <div className="bg-white border-2 border-purple-600 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
-              <div className="flex items-center gap-3 text-[#9333ea]">
+            <div className="bg-white border-2 border-blue-600 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+              <div className="flex items-center gap-3 text-blue-600">
                 <span className="material-symbols-outlined text-3xl font-bold">help_outline</span>
                 <h3 className="text-lg font-black uppercase tracking-wider">Finalizar Transporte</h3>
               </div>
@@ -1456,7 +1617,7 @@ export default function VeiculoEntregaModal() {
                     setShowFinalizeConfirm(false);
                     setShowFinalizeSummary(true);
                   }}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs uppercase rounded-lg transition-all shadow-md active:scale-95"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase rounded-lg transition-all shadow-md active:scale-95"
                 >
                   Sim
                 </button>
@@ -1503,7 +1664,7 @@ export default function VeiculoEntregaModal() {
           </div>
         )}
 
-        {/* Modal: showFinalizeSummary (FINALIZAR TRANSPORTE) */}
+        {/* Modal: showFinalizeSummary (FINALIZAR TRANSPORTE) with Blue Theme */}
         {showFinalizeSummary && (() => {
           const isFrozen = viewingTrpDetail.statusTransporte === 'EM_LIQUIDACAO' || viewingTrpDetail.statusTransporte === 'Finalizado';
           const totalClienteVal = isFrozen ? (viewingTrpDetail.clienteTotal ?? 0) : transportClients.filter(c => (c.statusEntrega || '').toLowerCase() !== 'retirada').length;
@@ -1514,47 +1675,47 @@ export default function VeiculoEntregaModal() {
 
           return (
             <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 overflow-y-auto">
-              <div className="bg-white w-full max-w-3xl rounded-3xl border-2 border-purple-600 shadow-2xl flex flex-col p-6 space-y-6 max-h-[95vh] overflow-y-auto animate-in zoom-in-95 duration-150">
+              <div className="bg-white w-full max-w-3xl rounded-3xl border-2 border-blue-600 shadow-2xl flex flex-col p-6 space-y-6 max-h-[95vh] overflow-y-auto animate-in zoom-in-95 duration-150">
                 
-                <div className="flex items-center justify-between border-b border-purple-100 pb-3">
-                  <div className="flex items-center gap-3 text-purple-700">
+                <div className="flex items-center justify-between border-b border-blue-100 pb-3">
+                  <div className="flex items-center gap-3 text-blue-700">
                     <span className="material-symbols-outlined text-3xl font-bold">task_alt</span>
                     <h3 className="text-xl font-black uppercase tracking-wider">Finalizar Entrega</h3>
                   </div>
                 </div>
 
-                {/* First Quadrant: Top Quadrant (bg: ROXO CLARO, borders: ROXO VIVO, inverted Date and No.) */}
-                <div className="border-2 border-purple-600 rounded-2xl p-4 bg-purple-50/70 space-y-4 shadow-2xs">
-                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-purple-200 pb-3">
+                {/* Summary with Blue accents */}
+                <div className="border-2 border-blue-600 rounded-2xl p-4 bg-blue-50/70 space-y-4 shadow-2xs">
+                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-blue-200 pb-3">
                     <div className="flex flex-wrap items-center gap-4 w-full">
                       
-                      {/* INVERTED POSITION: 1st Data de Entrega (Calendário) */}
+                      {/* Data de Entrega */}
                       <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-purple-600 text-2xl font-bold">calendar_month</span>
+                        <span className="material-symbols-outlined text-blue-600 text-2xl font-bold">calendar_month</span>
                         <span className="text-base font-extrabold text-slate-850">{viewingTrpDetail.date}</span>
                       </div>
 
-                      <div className="h-6 w-px bg-purple-300 hidden sm:block"></div>
+                      <div className="h-6 w-px bg-blue-300 hidden sm:block"></div>
 
-                      {/* INVERTED POSITION: 2nd Nº do Transporte */}
+                      {/* Nº do Transporte */}
                       <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-purple-600 text-2xl font-bold">description</span>
+                        <span className="material-symbols-outlined text-blue-600 text-2xl font-bold">description</span>
                         <span className="text-base font-extrabold text-slate-850">{viewingTrpDetail.number}</span>
                       </div>
 
-                      <div className="h-6 w-px bg-purple-300 hidden sm:block"></div>
+                      <div className="h-6 w-px bg-blue-300 hidden sm:block"></div>
 
                       {/* Veículo (Placa) */}
                       <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-purple-600 text-2xl font-bold">local_shipping</span>
+                        <span className="material-symbols-outlined text-blue-600 text-2xl font-bold">local_shipping</span>
                         <span className="text-base font-extrabold text-slate-850">{viewingTrpDetail.placa}</span>
                       </div>
 
-                      <div className="h-6 w-px bg-purple-300 hidden sm:block"></div>
+                      <div className="h-6 w-px bg-blue-300 hidden sm:block"></div>
 
-                      {/* Motorista (Funcionário Icon: badge) */}
+                      {/* Motorista */}
                       <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-purple-600 text-2xl font-bold">badge</span>
+                        <span className="material-symbols-outlined text-blue-600 text-2xl font-bold">badge</span>
                         <span className="text-base font-extrabold text-slate-850">{viewingTrpDetail.driver}</span>
                       </div>
                     </div>
@@ -1562,9 +1723,9 @@ export default function VeiculoEntregaModal() {
 
                   {/* Counter squares */}
                   <div className="grid grid-cols-5 gap-2.5">
-                    <div className="bg-purple-100 border border-purple-500 rounded-xl px-3 py-2 flex items-center justify-between">
-                      <span className="text-[10px] font-black text-purple-700 uppercase tracking-wider">Total Cliente</span>
-                      <span className="text-lg font-black text-purple-900 leading-none">{totalClienteVal}</span>
+                    <div className="bg-blue-100 border border-blue-500 rounded-xl px-3 py-2 flex items-center justify-between">
+                      <span className="text-[10px] font-black text-blue-700 uppercase tracking-wider">Total Cliente</span>
+                      <span className="text-lg font-black text-blue-900 leading-none">{totalClienteVal}</span>
                     </div>
                     <div className="bg-green-100 border border-green-500 rounded-xl px-3 py-2 flex items-center justify-between">
                       <span className="text-[10px] font-black text-green-700 uppercase tracking-wider">Entregue</span>
@@ -1578,42 +1739,42 @@ export default function VeiculoEntregaModal() {
                       <span className="text-[10px] font-black text-red-700 uppercase tracking-wider">Não Entregue</span>
                       <span className="text-lg font-black text-red-900 leading-none">{naoEntregueVal}</span>
                     </div>
-                    <div className="bg-purple-50 border border-purple-600 rounded-xl px-3 py-2 flex items-center justify-between">
-                      <span className="text-[10px] font-black text-purple-600 uppercase tracking-wider">Efetiv.</span>
-                      <span className="text-lg font-black text-purple-600 leading-none">{effectivenessVal}%</span>
+                    <div className="bg-blue-50 border border-blue-600 rounded-xl px-3 py-2 flex items-center justify-between">
+                      <span className="text-[10px] font-black text-blue-600 uppercase tracking-wider">Efetiv.</span>
+                      <span className="text-lg font-black text-blue-600 leading-none">{effectivenessVal}%</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Second Quadrant: format of lines and columns (bg: ROXO CLARO, borders: ROXO VIVO) */}
-                <div className="border-2 border-purple-600 rounded-2xl bg-purple-50/70 overflow-hidden shadow-2xs">
-                  <div className="bg-purple-100/50 px-4 py-2.5 border-b border-purple-200">
-                    <h4 className="text-xs font-black text-purple-700 uppercase tracking-wider">Resumo de Carga por Material</h4>
+                {/* Second Quadrant with Blue theme */}
+                <div className="border-2 border-blue-600 rounded-2xl bg-blue-50/70 overflow-hidden shadow-2xs">
+                  <div className="bg-blue-100/50 px-4 py-2.5 border-b border-blue-200">
+                    <h4 className="text-xs font-black text-blue-700 uppercase tracking-wider">Resumo de Carga por Material</h4>
                   </div>
-                  <div className="overflow-x-auto max-h-[220px] overflow-y-auto scrollbar-thin">
+                  <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
-                        <tr className="border-b border-purple-200 bg-purple-100/30 text-purple-700 font-extrabold uppercase text-[10px] tracking-wider">
+                        <tr className="border-b border-blue-200 bg-blue-100/30 text-blue-700 font-extrabold uppercase text-[10px] tracking-wider">
                           <th className="py-2.5 px-4">Material</th>
                           <th className="py-2.5 px-4 text-center">Não Entregue</th>
                           <th className="py-2.5 px-4 text-center">Coletado</th>
-                          <th className="py-2.5 px-4 text-center bg-purple-300 text-purple-950 font-black">QTDE TOTAL</th>
+                          <th className="py-2.5 px-4 text-center bg-blue-350 text-blue-950 font-black">QTDE TOTAL</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-purple-100">
+                      <tbody className="divide-y divide-blue-100">
                         {transportProducts.map((p) => {
                           const s = viewingTrpDetail.stock?.[p.id] || { veiculo: 0, coleta: 0, cliente: 0 };
                           const saida = s.saidaEntrega !== undefined ? s.saidaEntrega : s.veiculo;
                           const coleta = s.coleta || 0;
                           const totalRow = saida + coleta;
                           return (
-                            <tr key={p.id} className="hover:bg-purple-100/20 transition-colors font-medium text-[12px]">
+                            <tr key={p.id} className="hover:bg-blue-100/20 transition-colors font-medium text-[12px]">
                               <td className="py-2 px-4 text-[12px]">
                                 <div className="text-slate-800 font-semibold">{p.description}</div>
                               </td>
                               <td className="py-2 px-4 text-center font-mono text-slate-700 text-[12px]">{saida}</td>
                               <td className="py-2 px-4 text-center font-mono text-slate-700 text-[12px]">{coleta}</td>
-                              <td className="py-2 px-4 text-center font-mono font-black text-purple-950 text-[14px] bg-purple-300">{totalRow}</td>
+                              <td className="py-2 px-4 text-center font-mono font-black text-blue-950 text-[14px] bg-blue-300">{totalRow}</td>
                             </tr>
                           );
                         })}
@@ -1622,12 +1783,12 @@ export default function VeiculoEntregaModal() {
                   </div>
                 </div>
 
-                {/* Third Quadrant (bg: ROXO CLARO, borders: ROXO VIVO) */}
-                <div className="bg-purple-100 border-2 border-purple-600 rounded-2xl p-4 flex items-center justify-end gap-4 shadow-2xs">
-                  <span className="text-sm font-black text-purple-800 uppercase tracking-wider">
+                {/* Third Quadrant (bg: Blue CLARO, borders: Blue VIVO) */}
+                <div className="bg-blue-100 border-2 border-blue-600 rounded-2xl p-4 flex items-center justify-end gap-4 shadow-2xs">
+                  <span className="text-sm font-black text-blue-800 uppercase tracking-wider">
                     Saldo total de Produtos no veículo:
                   </span>
-                  <span className="text-2xl font-black text-purple-900 font-mono">
+                  <span className="text-2xl font-black text-blue-900 font-mono">
                     {transportProducts.reduce((sum, p) => {
                       const s = viewingTrpDetail.stock?.[p.id] || { veiculo: 0, coleta: 0, cliente: 0 };
                       const saida = s.saidaEntrega !== undefined ? s.saidaEntrega : s.veiculo;
@@ -1638,7 +1799,7 @@ export default function VeiculoEntregaModal() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center justify-end gap-3 border-t border-purple-100 pt-4">
+                <div className="flex items-center justify-end gap-3 border-t border-blue-100 pt-4">
                   <button
                     type="button"
                     onClick={() => setShowFinalizeSummary(false)}
@@ -1649,7 +1810,7 @@ export default function VeiculoEntregaModal() {
                   <button
                     type="button"
                     onClick={handleConfirmFinalize}
-                    className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs uppercase rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5"
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-1.5"
                   >
                     <span className="material-symbols-outlined text-sm font-bold">save</span>
                     Salvar
@@ -1677,8 +1838,8 @@ export default function VeiculoEntregaModal() {
 
         {successMessage && (
           <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in zoom-in-95 duration-100">
-            <div className="bg-white border-2 border-purple-600 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 text-center">
-              <div className="flex flex-col items-center gap-2 text-purple-600">
+            <div className="bg-white border-2 border-blue-600 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 text-center">
+              <div className="flex flex-col items-center gap-2 text-blue-600">
                 <span className="material-symbols-outlined text-5xl animate-bounce">check_circle</span>
                 <h3 className="text-base font-black uppercase tracking-wider mt-2">Sucesso</h3>
               </div>
@@ -1691,20 +1852,20 @@ export default function VeiculoEntregaModal() {
 
         {showSobrasModal && viewingTrpDetail && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-            <div className="bg-white w-full max-w-4xl rounded-2xl overflow-hidden border border-purple-500 shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="bg-white w-full max-w-4xl rounded-2xl overflow-hidden border border-blue-500 shadow-2xl flex flex-col max-h-[85vh]">
               {/* Header */}
-              <div className="bg-[#9333ea] px-6 py-4 flex items-center justify-between text-white flex-shrink-0">
+              <div className="bg-blue-600 px-6 py-4 flex items-center justify-between text-white flex-shrink-0">
                 <div className="flex items-center gap-3">
                   <span className="material-symbols-outlined text-white text-3xl font-bold">visibility</span>
                   <div>
                     <h3 className="text-lg font-black uppercase tracking-wider">Estoque Temporário: Sobras</h3>
-                    <p className="text-xs font-bold text-purple-100 mt-0.5">Transporte: {viewingTrpDetail.number} | Motorista: {viewingTrpDetail.driver}</p>
+                    <p className="text-xs font-bold text-blue-100 mt-0.5">Transporte: {viewingTrpDetail.number} | Motorista: {viewingTrpDetail.driver}</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowSobrasModal(false)}
-                  className="text-white hover:text-purple-200 transition-colors p-1.5 rounded-full hover:bg-white/10 flex items-center justify-center"
+                  className="text-white hover:text-blue-200 transition-colors p-1.5 rounded-full hover:bg-white/10 flex items-center justify-center"
                 >
                   <span className="material-symbols-outlined font-bold text-xl">close</span>
                 </button>
@@ -1712,17 +1873,17 @@ export default function VeiculoEntregaModal() {
 
               {/* Table */}
               <div className="p-6 overflow-y-auto flex-1 bg-gray-50">
-                <div className="border border-purple-100 rounded-xl bg-white shadow-xs overflow-hidden">
+                <div className="border border-blue-100 rounded-xl bg-white shadow-xs overflow-hidden">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="bg-purple-50 text-purple-900 border-b border-purple-100 font-extrabold uppercase text-[10px] tracking-wider">
+                      <tr className="bg-blue-50 text-blue-900 border-b border-blue-100 font-extrabold uppercase text-[10px] tracking-wider">
                         <th className="py-3 px-4">Matrícula</th>
                         <th className="py-3 px-4">Razão Social</th>
                         <th className="py-3 px-4">Descrição do Produto</th>
                         <th className="py-3 px-4 text-center">Quantidade de Sobra</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-purple-50 text-slate-700">
+                    <tbody className="divide-y divide-blue-50 text-slate-700">
                       {(!viewingTrpDetail.sobras || viewingTrpDetail.sobras.length === 0) ? (
                         <tr>
                           <td colSpan={4} className="py-8 text-center text-xs text-gray-400 italic">
@@ -1730,8 +1891,8 @@ export default function VeiculoEntregaModal() {
                           </td>
                         </tr>
                       ) : (
-                        viewingTrpDetail.sobras.map((sob, sIdx) => (
-                          <tr key={sIdx} className="hover:bg-purple-50/10 transition-colors font-medium">
+                        viewingTrpDetail.sobras.map((sob: any, sIdx: number) => (
+                          <tr key={sIdx} className="hover:bg-blue-50/10 transition-colors font-medium">
                             <td className="py-3 px-4 font-bold text-slate-950 font-mono">{sob.matricula}</td>
                             <td className="py-3 px-4 font-bold text-slate-800 uppercase">{sob.razaoSocial}</td>
                             <td className="py-3 px-4 text-slate-700 font-bold uppercase">{sob.descricaoProduto}</td>
@@ -1749,7 +1910,7 @@ export default function VeiculoEntregaModal() {
                 <button
                   type="button"
                   onClick={() => setShowSobrasModal(false)}
-                  className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-[12px] uppercase rounded-xl transition-all shadow-md active:scale-95"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[12px] uppercase rounded-xl transition-all shadow-md active:scale-95"
                 >
                   Fechar
                 </button>
@@ -1764,21 +1925,21 @@ export default function VeiculoEntregaModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200 overflow-y-auto">
-      <div className="bg-white w-full max-w-5xl rounded-2xl overflow-hidden border border-purple-200 shadow-2xl flex flex-col h-[92vh] my-4">
+      <div className="bg-white w-full max-w-5xl rounded-2xl overflow-hidden border border-blue-200 shadow-2xl flex flex-col h-[92vh] my-4">
         
-        {/* Header Bar */}
-        <div className="bg-[#9333ea] px-6 py-4 flex items-center justify-between text-white flex-shrink-0">
+        {/* Header Bar: Blue theme */}
+        <div className="bg-blue-600 px-6 py-4 flex items-center justify-between text-white flex-shrink-0">
           <div className="flex items-center gap-2.5">
             <span className="material-symbols-outlined text-white text-2xl">local_shipping</span>
             <div>
-              <h3 className="text-base font-black uppercase tracking-wider">Transportes em Aberto</h3>
-              <p className="text-[10px] text-purple-100 font-bold uppercase tracking-wider">Selecione um veículo/transporte para visualizar</p>
+              <h3 className="text-base font-black uppercase tracking-wider">Transportes em Aberto (Lançar Saída)</h3>
+              <p className="text-[10px] text-blue-100 font-bold uppercase tracking-wider">Selecione um veículo/transporte para visualizar</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             {/* Profile type selector */}
             <div className="flex items-center gap-1.5">
-              <label htmlFor="user-profile-select-veiculo" className="text-[9px] font-bold uppercase tracking-widest text-purple-100 hidden sm:inline">Perfil:</label>
+              <label htmlFor="user-profile-select-veiculo" className="text-[9px] font-bold uppercase tracking-widest text-blue-100 hidden sm:inline">Perfil:</label>
               <select
                 id="user-profile-select-veiculo"
                 value={userRole || ''}
@@ -1786,7 +1947,7 @@ export default function VeiculoEntregaModal() {
                   const val = e.target.value;
                   setUserRole(val || null);
                 }}
-                className="bg-purple-700 hover:bg-purple-800 border border-purple-500 text-white font-bold text-[10px] uppercase tracking-wider rounded-lg px-2 py-1.5 focus:ring-1 focus:ring-purple-300 outline-none cursor-pointer"
+                className="bg-blue-700 hover:bg-blue-800 border border-blue-500 text-white font-bold text-[10px] uppercase tracking-wider rounded-lg px-2 py-1.5 focus:ring-1 focus:ring-blue-300 outline-none cursor-pointer"
                 title="Mudar Tipo de Perfil"
               >
                 <option value="Gerencial">Gerencial</option>
@@ -1814,7 +1975,7 @@ export default function VeiculoEntregaModal() {
           
           {filteredTransports.length === 0 ? (
             <div className="text-center py-12 text-gray-400 italic text-xs">
-              Nenhum transporte encontrado com status SAÍDA ou EM ENTREGA.
+              Nenhum transporte encontrado com status CRIADO.
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1828,8 +1989,6 @@ export default function VeiculoEntregaModal() {
                 let statusBg = 'bg-gray-100 text-gray-700';
                 if (displayStatus === 'CRIADO') {
                   statusBg = 'bg-blue-100 text-blue-700';
-                } else if (displayStatus === 'SAIDA' || displayStatus === 'SAÍDA') {
-                  statusBg = 'bg-sky-100 text-sky-700';
                 } else if (displayStatus === 'EM ENTREGA') {
                   statusBg = 'bg-amber-100 text-amber-700';
                 } else if (displayStatus === 'CONCLUIDO' || displayStatus === 'LIQUIDADO') {
@@ -1842,38 +2001,29 @@ export default function VeiculoEntregaModal() {
                     onClick={() => {
                       setSelectedTrpId(t.id);
                       setViewingTrpDetail(t.raw);
-
-                      const isCriado = t.status.toString().toUpperCase() === 'CRIADO';
-                      if (isCriado) {
-                        const clientIds = t.raw.selectedClientIds || [];
-                        clientIds.forEach((cid: string) => {
-                          const clientObj = clients.find(c => c.id === cid);
-                          if (clientObj) {
-                            updateClient({
-                              ...clientObj,
-                              statusEntrega: 'Em Entrega'
-                            });
-                          }
-                        });
-                      }
+                      const initialQuantities: { [productId: string]: string } = {};
+                      products.forEach(p => {
+                        const currentQty = t.raw.stock?.[p.id]?.veiculo || 0;
+                        initialQuantities[p.id] = String(currentQty);
+                      });
+                      setLancarSaidaQuantities(initialQuantities);
                     }}
                     className={`cursor-pointer p-5 rounded-xl border-2 transition-all flex flex-col space-y-3 relative bg-white shadow-3xs hover:shadow-sm ${
                       isSelected
-                        ? 'border-[#9333ea] ring-2 ring-purple-100 bg-purple-50/10'
-                        : 'border-[#9333ea] hover:border-purple-750'
+                        ? 'border-blue-600 ring-2 ring-blue-100 bg-blue-50/10'
+                        : 'border-blue-600 hover:border-blue-700'
                     }`}
                   >
                     {/* Selection Indicator */}
                     {isSelected && (
-                      <div className="absolute top-2 right-2 flex items-center justify-center w-5 h-5 rounded-full bg-[#9333ea] text-white shadow-3xs">
+                      <div className="absolute top-2 right-2 flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white shadow-3xs">
                         <span className="material-symbols-outlined text-xs font-black">check</span>
                       </div>
                     )}
-
                     {/* Line 1: Nº do Transporte & Status */}
                     <div className="flex items-center justify-between gap-2 border-b border-gray-100 pb-2">
                       <div className="flex items-center gap-1 text-[10px] font-bold text-slate-800 uppercase">
-                        <span className="material-symbols-outlined text-[#9333ea] font-bold text-sm">add_road</span>
+                        <span className="material-symbols-outlined text-blue-600 font-bold text-sm">add_road</span>
                         <span>{t.number}</span>
                       </div>
                       <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${statusBg}`}>
@@ -1883,13 +2033,13 @@ export default function VeiculoEntregaModal() {
 
                     {/* Line 2: Veículo */}
                     <div className="flex items-center gap-2 text-[10px] font-bold text-slate-700 uppercase">
-                      <span className="material-symbols-outlined text-[#9333ea] font-bold text-sm">local_shipping</span>
+                      <span className="material-symbols-outlined text-blue-600 font-bold text-sm">local_shipping</span>
                       <span>{t.vehicle}</span>
                     </div>
 
                     {/* Line 3: Motorista */}
                     <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600 uppercase">
-                      <span className="material-symbols-outlined text-[#9333ea] font-bold text-sm">person</span>
+                      <span className="material-symbols-outlined text-blue-600 font-bold text-sm">person</span>
                       <span>{t.driver}</span>
                     </div>
                   </div>
@@ -1913,62 +2063,6 @@ export default function VeiculoEntregaModal() {
             </button>
           )}
         </div>
-
-        {/* Modal/Overlay: Motivo da não entrega */}
-        {showMotivoModal && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/65 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-            <div className="bg-white border-2 border-red-500 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 text-black">
-              <div className="flex items-center gap-3 text-red-600 border-b border-red-100 pb-2">
-                <span className="material-symbols-outlined text-3xl font-bold">report_problem</span>
-                <h3 className="text-lg font-black uppercase tracking-wider">Motivo da não entrega</h3>
-              </div>
-              
-              <p className="text-slate-750 text-xs font-bold uppercase tracking-wider">
-                Selecione o motivo obrigatório para a não realização da entrega:
-              </p>
-
-              <div className="space-y-1.5">
-                <label htmlFor="motivo-select" className="text-[11px] font-black text-slate-700 uppercase tracking-wider block">
-                  Motivo <span className="text-red-600 font-bold">*</span>
-                </label>
-                <select
-                  id="motivo-select"
-                  value={motivoNaoEntrega}
-                  onChange={(e) => setMotivoNaoEntrega(e.target.value)}
-                  className="w-full bg-white border-2 border-red-200 rounded-xl px-3 py-2.5 text-xs font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-red-400"
-                >
-                  <option value="Fechado">Fechado</option>
-                  <option value="Fora de Rota">Fora de Rota</option>
-                  <option value="Não fez pedido">Não fez pedido</option>
-                  <option value="Produto Danificado">Produto Danificado</option>
-                  <option value="Estouro de Jornada">Estouro de Jornada</option>
-                </select>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsNaoRealizadaEntrega(false);
-                    setShowMotivoModal(false);
-                  }}
-                  className="px-4 py-2 bg-gray-150 hover:bg-gray-250 text-slate-700 font-extrabold text-xs uppercase rounded-lg transition-all"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowMotivoModal(false);
-                  }}
-                  className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs uppercase rounded-lg transition-all shadow-md active:scale-95"
-                >
-                  Confirmar Motivo
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
       </div>
     </div>
